@@ -46,9 +46,23 @@ assert_eq!(frame.as_bytes().len(), 320 * 480);
 # }
 ```
 
-`RawFrame::as_bytes()` can be passed to a WSQ encoder or fingerprint template
-extractor. Compression and minutiae extraction are deliberately outside this
-crate's scope.
+The captured [`RawFrame`] provides direct methods for FBI-compliant WSQ compression
+and decompression:
+
+```no_run
+# use futronic_fs80h_rs::{FutronicDevice, RawFrame};
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+# let mut scanner = FutronicDevice::open_first()?;
+# let frame = scanner.capture_frame()?;
+// Compress the 153,600-byte frame to FBI WSQ format (~12 KB, 15:1 ratio)
+let wsq_bytes = frame.to_wsq(Some(RawFrame::DEFAULT_WSQ_BITRATE))?;
+
+// Decompress WSQ bytes back to a calibrated 320x480 RawFrame
+let reconstructed = RawFrame::from_wsq(&wsq_bytes)?;
+assert_eq!(reconstructed.as_bytes().len(), 320 * 480);
+# Ok(())
+# }
+```
 
 ## Hardware validation
 
@@ -68,6 +82,12 @@ The example writes four views of the biometric capture:
 - `fingerprint_inverted.png`: Inverted grayscale intensities (`255 - pixel`), matching standard AFIS and `FTRSDK_Coca` views (dark papillary ridges on light background).
 - `fingerprint_normalized.png`: Non-contact glass prism background whitened to pure `#FFFFFF` with bezel shadows suppressed and ridge contrast expanded.
 - `fingerprint_enhanced.png`: Biometric ridge-sharpened view for high-confidence minutiae extraction and pore detection.
+
+To capture, compress directly to FBI WSQ, and verify reconstructed fidelity:
+
+```sh
+cargo run --example capture_to_wsq
+```
 
 To inspect connected Futronic USB devices and endpoint descriptors without capturing:
 

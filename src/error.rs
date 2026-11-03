@@ -67,4 +67,31 @@ pub enum ScannerError {
 
     #[error("incomplete USB command write: sent {written} of {expected} bytes")]
     IncompleteCommand { written: usize, expected: usize },
+
+    #[cfg(feature = "wsq")]
+    #[error(transparent)]
+    Wsq(#[from] WsqError),
+}
+
+/// Failures returned by the WSQ compression and decompression routines.
+#[cfg(feature = "wsq")]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum WsqError {
+    #[error("WSQ compression failed with code {0}")]
+    EncodeFailed(i32),
+
+    #[error("WSQ decompression failed with code {0}")]
+    DecodeFailed(i32),
+
+    #[error("invalid bitrate {0}: must be positive and between 0.1 and 2.5")]
+    InvalidBitrate(String),
+
+    #[error("unsupported pixel depth {0}: expected 8-bit grayscale")]
+    UnsupportedDepth(i32),
+
+    #[error("decompressed frame size mismatch: got {received} bytes, expected {expected}")]
+    SizeMismatch { received: usize, expected: usize },
+
+    #[error("input WSQ buffer is empty or corrupted")]
+    EmptyBuffer,
 }

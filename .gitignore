@@ -3,3 +3,6 @@ Cargo.lock
 .DS_Store
 *.png
 *.bin
+*.wsq
+*.o
+*.a

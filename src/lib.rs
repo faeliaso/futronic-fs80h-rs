@@ -1,7 +1,7 @@
 //! Native userspace USB capture for Futronic FS80H and FS81H scanners.
 //!
-//! The crate returns only an uncompressed 8-bit grayscale [`RawFrame`]. It
-//! deliberately does not implement WSQ encoding or biometric matching.
+//! The crate returns an uncompressed 8-bit grayscale [`RawFrame`], with
+//! built-in support for FBI-compliant WSQ compression and decompression.
 //!
 //! ```no_run
 //! use futronic_fs80h_rs::FutronicDevice;
@@ -18,8 +18,12 @@ mod device;
 pub mod error;
 pub mod frame;
 mod protocol;
+#[cfg(feature = "wsq")]
+pub mod wsq;
 
 pub use device::{DeviceInfo, FutronicDevice};
+#[cfg(feature = "wsq")]
+pub use error::WsqError;
 pub use error::{ScannerError, UsbOperation};
 pub use frame::{resample_bilinear, RawFrame};
 pub use protocol::{

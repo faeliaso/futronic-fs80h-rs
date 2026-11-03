@@ -69,6 +69,41 @@ impl RawFrame {
         &self.data
     }
 
+    /// Recommended target bitrate for standard FBI 15:1 lossy compression (0.75 bpp).
+    pub const DEFAULT_WSQ_BITRATE: f32 = 0.75;
+
+    /// Compresses the raw 8-bit grayscale biometric frame into FBI WSQ format.
+    ///
+    /// `bitrate` specifies the target bits-per-pixel ratio (typically `0.75` for ~15:1
+    /// compression). Passing `None` defaults to [`Self::DEFAULT_WSQ_BITRATE`].
+    #[cfg(feature = "wsq")]
+    pub fn to_wsq(&self, bitrate: Option<f32>) -> Result<Vec<u8>, crate::error::WsqError> {
+        let r = bitrate.unwrap_or(Self::DEFAULT_WSQ_BITRATE);
+        crate::wsq::encode_to_wsq(
+            self.as_bytes(),
+            self.width() as usize,
+            self.height() as usize,
+            self.dpi() as usize,
+            r,
+        )
+    }
+
+    /// Reconstructs a [`RawFrame`] from an FBI-compliant WSQ compressed byte stream.
+    #[cfg(feature = "wsq")]
+    pub fn from_wsq(wsq_bytes: &[u8]) -> Result<Self, crate::error::WsqError> {
+        let (pixels, width, height, _ppi) = crate::wsq::decode_from_wsq(wsq_bytes)?;
+        if width != SENSOR_WIDTH || height != SENSOR_HEIGHT || pixels.len() != RAW_FRAME_SIZE {
+            return Err(crate::error::WsqError::SizeMismatch {
+                received: pixels.len(),
+                expected: RAW_FRAME_SIZE,
+            });
+        }
+        Self::new(pixels).map_err(|_| crate::error::WsqError::SizeMismatch {
+            received: 0,
+            expected: RAW_FRAME_SIZE,
+        })
+    }
+
     /// Returns a diagnostic view stretched between two histogram percentiles.
     ///
     /// `low_percentile` and `high_percentile` are expressed in the inclusive
