@@ -1,0 +1,17 @@
+[package]
+name = "futronic-fs80h-rs"
+version = "0.1.0"
+edition = "2021"
+description = "Pure Rust userspace USB driver for Futronic FS80H and FS81H fingerprint scanners."
+license = "MIT"
+readme = "README.md"
+keywords = ["biometrics", "fingerprint", "usb", "futronic", "driver"]
+categories = ["hardware-support"]
+
+[dependencies]
+rusb = "0.9"
+thiserror = "1.0"
+tracing = { version = "0.1", default-features = false }
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }
