@@ -174,6 +174,11 @@ impl IsoTemplate {
     pub const fn mean_quality(&self) -> u8 {
         self.mean_quality
     }
+    /// Returns the encoded finger position.
+    #[must_use]
+    pub const fn finger_position(&self) -> FingerPosition {
+        self.finger_position
+    }
     /// Returns the ISO revision used by this record.
     #[must_use]
     pub const fn format(&self) -> IsoFormat {

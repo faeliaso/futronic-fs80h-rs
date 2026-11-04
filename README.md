@@ -131,6 +131,51 @@ profile at 500 DPI with the standard `Vendor Unknown` identifier (`0x0103`); it 
 of ANSI, government, or partner-system certification. Import rejects multi-fingerprint records,
 vendor extensions, and unsupported ridge-count extensions.
 
+## Local AFIS matching
+
+The default features include a local minutiae matcher for 1:1 verification and linear 1:N search.
+It compares parsed ISO/IEC 19794-2 and ANSI INCITS 378 templates directly; it can also extract a
+probe template from a captured `RawFrame` or WSQ image. No image or template is sent to a service.
+
+```no_run
+use futronic_fs80h_rs::{FutronicDevice, Matcher, MatcherOptions, TemplateOptions};
+
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let matcher = Matcher::new(MatcherOptions { threshold: 0.285 })?;
+let mut scanner = FutronicDevice::open_first()?;
+let live = scanner.capture_frame()?.extract_iso_template(&TemplateOptions::default())?;
+
+// `enrolled` can be an IsoTemplate or an AnsiTemplate loaded from protected storage.
+# let enrolled = live.clone();
+let result = matcher.verify(&enrolled, &live)?;
+println!("score={:.3}, matched={}", result.score, result.is_match);
+# Ok(())
+# }
+```
+
+`Matcher::identify` receives application-owned `(id, &template)` pairs and returns matching
+candidates in descending score order. Base64 is available through explicit methods
+(`verify_iso_base64`, `verify_ansi_base64`, and `verify_wsq_base64`) so byte formats are never
+guessed. Scores and thresholds require calibration on representative data; this is not liveness
+detection and does not provide a universal FAR/FRR guarantee. The `0.285` value in the example
+comes from the local scanner test data; recalibrate it for every deployment.
+
+With a connected scanner, a live 1:1 smoke test captures the same finger twice:
+
+```sh
+cargo run --release --example verify_live_match
+```
+
+To collect repeated scores and obtain a data-driven test threshold, run:
+
+```sh
+cargo run --release --example calibrate_live_match -- calibration.csv
+```
+
+Use `g` for repeated captures of the enrolled finger and `i` for a different finger. The optional
+CSV file is written incrementally as `kind,score`; the example reports its observed false-accept
+rate (FAR), false-reject rate (FRR), and the threshold with the lowest combined observed error.
+
 To inspect connected Futronic USB devices and endpoint descriptors without capturing:
 
 ```sh

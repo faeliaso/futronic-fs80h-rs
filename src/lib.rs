@@ -17,6 +17,8 @@
 mod device;
 pub mod error;
 pub mod frame;
+#[cfg(feature = "matcher")]
+pub mod matcher;
 mod protocol;
 #[cfg(feature = "templates")]
 pub mod template;
@@ -28,6 +30,10 @@ pub use device::{DeviceInfo, FutronicDevice};
 pub use error::WsqError;
 pub use error::{ScannerError, UsbOperation};
 pub use frame::{resample_bilinear, RawFrame};
+#[cfg(feature = "matcher")]
+pub use matcher::{
+    CandidateMatch, FingerprintTemplate, MatchResult, Matcher, MatcherError, MatcherOptions,
+};
 pub use protocol::{
     BULK_CHUNK_SIZE, DEFAULT_IMAGE_DOSE, RAW_FRAME_SIZE, RAW_SENSOR_HEIGHT, RAW_SENSOR_STREAM_SIZE,
     RAW_SENSOR_WIDTH, SENSOR_DPI, SENSOR_HEIGHT, SENSOR_WIDTH,
