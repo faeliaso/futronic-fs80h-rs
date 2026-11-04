@@ -91,6 +91,32 @@ impl RawFrame {
         crate::template::extract_as(self, format, options)
     }
 
+    /// Extracts a quality-gated ANSI INCITS 378-2009/AM1 fingerprint template.
+    ///
+    /// The template represents one live, plain fingerprint view. It does not write the source
+    /// image to disk.
+    #[cfg(feature = "ansi-378")]
+    pub fn extract_ansi_template(
+        &self,
+        options: &crate::template::TemplateOptions,
+    ) -> Result<crate::template::ansi::AnsiTemplate, crate::template::TemplateError> {
+        crate::template::ansi::extract(
+            self,
+            crate::template::ansi::AnsiFormat::Ansi3782009Am1,
+            options,
+        )
+    }
+
+    /// Extracts a quality-gated ANSI INCITS 378 template in a selected revision.
+    #[cfg(feature = "ansi-378")]
+    pub fn extract_ansi_template_as(
+        &self,
+        format: crate::template::ansi::AnsiFormat,
+        options: &crate::template::TemplateOptions,
+    ) -> Result<crate::template::ansi::AnsiTemplate, crate::template::TemplateError> {
+        crate::template::ansi::extract(self, format, options)
+    }
+
     /// Recommended target bitrate for standard FBI 15:1 lossy compression (0.75 bpp).
     pub const DEFAULT_WSQ_BITRATE: f32 = 0.75;
 

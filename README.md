@@ -106,6 +106,31 @@ The default export is ISO/IEC 19794-2:2011. For legacy systems, call
 ISO/IEC 19794-2:2005 + Cor.1:2009. `IsoTemplate::from_bytes` detects and validates either
 normal/off-card ISO revision automatically.
 
+ANSI INCITS 378 templates are also available in the default feature set. ANSI 378 and ISO
+19794-2 are distinct binary formats even where they share the `FMR` signature and revision
+markers, so use the dedicated ANSI APIs rather than renaming an ISO file:
+
+```no_run
+# use futronic_fs80h_rs::{FutronicDevice, AnsiFormat, TemplateOptions};
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+# let mut scanner = FutronicDevice::open_first()?;
+# let frame = scanner.capture_frame()?;
+let template = frame.extract_ansi_template_as(
+    AnsiFormat::Ansi3782009Am1,
+    &TemplateOptions::default(),
+)?;
+let parsed = futronic_fs80h_rs::AnsiTemplate::from_bytes(template.as_bytes())?;
+assert_eq!(parsed.format(), AnsiFormat::Ansi3782009Am1);
+# Ok(())
+# }
+```
+
+Run `cargo run --example capture_to_ansi_template` to create one ANSI 378-2004, 2009, and
+2009/AM1 file from a capture. The implementation emits a strict, one-fingerprint live/plain
+profile at 500 DPI with the standard `Vendor Unknown` identifier (`0x0103`); it is not a claim
+of ANSI, government, or partner-system certification. Import rejects multi-fingerprint records,
+vendor extensions, and unsupported ridge-count extensions.
+
 To inspect connected Futronic USB devices and endpoint descriptors without capturing:
 
 ```sh

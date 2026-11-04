@@ -9,9 +9,10 @@ keywords = ["biometrics", "fingerprint", "usb", "futronic", "driver", "wsq"]
 categories = ["hardware-support"]
 
 [features]
-default = ["wsq", "templates"]
+default = ["wsq", "templates", "ansi-378"]
 wsq = ["dep:cc"]
 templates = ["dep:fprint-mindtct"]
+ansi-378 = ["templates"]
 
 [dependencies]
 rusb = "0.9"
@@ -29,6 +30,10 @@ required-features = ["wsq"]
 [[example]]
 name = "capture_to_iso_template"
 required-features = ["templates"]
+
+[[example]]
+name = "capture_to_ansi_template"
+required-features = ["ansi-378"]
 
 [dev-dependencies]
 image = { version = "0.25", default-features = false, features = ["png"] }

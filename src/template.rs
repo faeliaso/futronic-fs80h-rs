@@ -9,6 +9,9 @@ use fprint_mindtct::{debug_maps, debug_removed_minutiae, detect_minutiae, GrayIm
 use std::collections::HashMap;
 use thiserror::Error;
 
+#[cfg(feature = "ansi-378")]
+pub mod ansi;
+
 const WIDTH: usize = 320;
 const HEIGHT: usize = 480;
 const DPI: u16 = 500;
@@ -199,6 +202,9 @@ pub enum TemplateError {
     /// The ISO record is malformed or outside the supported profile.
     #[error("invalid ISO/IEC 19794-2 template: {0}")]
     InvalidTemplate(&'static str),
+    /// The ANSI INCITS 378 record is malformed or outside the supported one-finger profile.
+    #[error("invalid ANSI INCITS 378 template: {0}")]
+    InvalidAnsiTemplate(&'static str),
 }
 
 pub(crate) fn extract(

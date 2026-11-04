@@ -32,6 +32,8 @@ pub use protocol::{
     BULK_CHUNK_SIZE, DEFAULT_IMAGE_DOSE, RAW_FRAME_SIZE, RAW_SENSOR_HEIGHT, RAW_SENSOR_STREAM_SIZE,
     RAW_SENSOR_WIDTH, SENSOR_DPI, SENSOR_HEIGHT, SENSOR_WIDTH,
 };
+#[cfg(feature = "ansi-378")]
+pub use template::ansi::{AnsiFormat, AnsiTemplate};
 #[cfg(feature = "templates")]
 pub use template::{
     FingerPosition, IsoFormat, IsoTemplate, Minutia, MinutiaKind, SingularPoint, SingularPointKind,
