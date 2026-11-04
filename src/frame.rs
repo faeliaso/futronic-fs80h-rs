@@ -81,6 +81,16 @@ impl RawFrame {
         crate::template::extract(self, options)
     }
 
+    /// Extracts a quality-gated template in a selected ISO/IEC 19794-2 revision.
+    #[cfg(feature = "templates")]
+    pub fn extract_iso_template_as(
+        &self,
+        format: crate::template::IsoFormat,
+        options: &crate::template::TemplateOptions,
+    ) -> Result<crate::template::IsoTemplate, crate::template::TemplateError> {
+        crate::template::extract_as(self, format, options)
+    }
+
     /// Recommended target bitrate for standard FBI 15:1 lossy compression (0.75 bpp).
     pub const DEFAULT_WSQ_BITRATE: f32 = 0.75;
 

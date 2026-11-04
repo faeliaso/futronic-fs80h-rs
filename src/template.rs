@@ -14,6 +14,15 @@ const HEIGHT: usize = 480;
 const DPI: u16 = 500;
 const RESOLUTION_PPCM: u16 = 197;
 
+/// Interoperable normal/off-card ISO fingerprint-minutiae encodings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IsoFormat {
+    /// ISO/IEC 19794-2:2005 with Technical Corrigendum 1:2009.
+    Iso2005,
+    /// ISO/IEC 19794-2:2011 with Technical Corrigendum 1:2012.
+    Iso2011,
+}
+
 /// Options controlling quality gating and singular-point estimation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateOptions {
@@ -125,7 +134,7 @@ pub struct SingularPoint {
     pub confidence: u8,
 }
 
-/// Extracted template and its ISO/IEC 19794-2:2011 binary representation.
+/// Extracted template and its ISO/IEC 19794-2 binary representation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IsoTemplate {
     bytes: Vec<u8>,
@@ -133,10 +142,11 @@ pub struct IsoTemplate {
     singular_points: Vec<SingularPoint>,
     mean_quality: u8,
     finger_position: FingerPosition,
+    format: IsoFormat,
 }
 
 impl IsoTemplate {
-    /// Returns the complete ISO/IEC 19794-2:2011 normal off-card record.
+    /// Returns the complete ISO/IEC 19794-2 normal off-card record.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes
@@ -161,6 +171,11 @@ impl IsoTemplate {
     pub const fn mean_quality(&self) -> u8 {
         self.mean_quality
     }
+    /// Returns the ISO revision used by this record.
+    #[must_use]
+    pub const fn format(&self) -> IsoFormat {
+        self.format
+    }
     /// Validates and parses records emitted by this module.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, TemplateError> {
         parse(bytes)
@@ -182,12 +197,21 @@ pub enum TemplateError {
         minimum_quality: u8,
     },
     /// The ISO record is malformed or outside the supported profile.
-    #[error("invalid ISO/IEC 19794-2:2011 template: {0}")]
+    #[error("invalid ISO/IEC 19794-2 template: {0}")]
     InvalidTemplate(&'static str),
 }
 
 pub(crate) fn extract(
     frame: &RawFrame,
+    options: &TemplateOptions,
+) -> Result<IsoTemplate, TemplateError> {
+    extract_as(frame, IsoFormat::Iso2011, options)
+}
+
+/// Extracts and encodes a template in the requested ISO revision.
+pub(crate) fn extract_as(
+    frame: &RawFrame,
+    format: IsoFormat,
     options: &TemplateOptions,
 ) -> Result<IsoTemplate, TemplateError> {
     let inverted = frame.inverted();
@@ -236,13 +260,17 @@ pub(crate) fn extract(
         });
     }
     let points = estimate_singular_points(debug_maps(image), options.singular_point_confidence);
-    let bytes = serialize(&minutiae, &points, mean, options.finger_position);
+    let bytes = match format {
+        IsoFormat::Iso2005 => serialize_2005(&minutiae, &points, mean, options.finger_position),
+        IsoFormat::Iso2011 => serialize_2011(&minutiae, &points, mean, options.finger_position),
+    };
     Ok(IsoTemplate {
         bytes,
         minutiae,
         singular_points: points,
         mean_quality: mean,
         finger_position: options.finger_position,
+        format,
     })
 }
 
@@ -345,7 +373,7 @@ fn estimate_singular_points(maps: fprint_mindtct::DebugMaps, threshold: u8) -> V
     out
 }
 
-fn serialize(
+fn serialize_2011(
     minutiae: &[Minutia],
     points: &[SingularPoint],
     mean: u8,
@@ -407,6 +435,62 @@ fn serialize(
     let _ = mean;
     out
 }
+
+fn serialize_2005(
+    minutiae: &[Minutia],
+    points: &[SingularPoint],
+    mean: u8,
+    position: FingerPosition,
+) -> Vec<u8> {
+    let mut extensions = Vec::new();
+    if !points.is_empty() {
+        let mut data = Vec::new();
+        let cores: Vec<_> = points
+            .iter()
+            .filter(|p| p.kind == SingularPointKind::Core)
+            .collect();
+        data.push(cores.len() as u8);
+        for point_value in cores {
+            point(&mut data, point_value);
+        }
+        let deltas: Vec<_> = points
+            .iter()
+            .filter(|p| p.kind == SingularPointKind::Delta)
+            .collect();
+        data.push(deltas.len() as u8);
+        for point_value in deltas {
+            point(&mut data, point_value);
+        }
+        put_u16(&mut extensions, 2);
+        put_u16(&mut extensions, data.len() as u16); // 2005 EXTLEN excludes extension header.
+        extensions.extend(data);
+    }
+    let total = 30 + minutiae.len() * 6 + extensions.len();
+    let mut out = Vec::with_capacity(total);
+    out.extend(*b"FMR\0");
+    out.extend(*b" 20\0");
+    put_u32(&mut out, total as u32);
+    put_u16(&mut out, 0); // DEVSTAMP + DEVID: unknown/not certified.
+    put_u16(&mut out, WIDTH as u16);
+    put_u16(&mut out, HEIGHT as u16);
+    put_u16(&mut out, RESOLUTION_PPCM);
+    put_u16(&mut out, RESOLUTION_PPCM);
+    out.extend([1, 0]); // one finger, reserved byte
+    out.push(position as u8);
+    out.push(0); // view 0, live/plain
+    out.push(mean);
+    out.push(minutiae.len() as u8);
+    for m in minutiae {
+        put_u16(&mut out, (m.kind.bits() << 14) | m.x);
+        put_u16(&mut out, m.y);
+        out.push(m.angle);
+        out.push(m.quality);
+    }
+    put_u16(&mut out, extensions.len() as u16);
+    out.extend(extensions);
+    debug_assert_eq!(out.len(), total);
+    out
+}
 fn point(out: &mut Vec<u8>, p: &SingularPoint) {
     put_u16(out, p.x & 0x3fff);
     put_u16(out, p.y & 0x3fff);
@@ -419,7 +503,13 @@ fn put_u32(out: &mut Vec<u8>, v: u32) {
 }
 
 fn parse(bytes: &[u8]) -> Result<IsoTemplate, TemplateError> {
-    if bytes.len() < 54 || &bytes[..4] != b"FMR\0" || &bytes[4..8] != b"030\0" {
+    if bytes.len() < 8 || &bytes[..4] != b"FMR\0" {
+        return Err(TemplateError::InvalidTemplate("unsupported header"));
+    }
+    if &bytes[4..8] == b" 20\0" {
+        return parse_2005(bytes);
+    }
+    if &bytes[4..8] != b"030\0" || bytes.len() < 54 {
         return Err(TemplateError::InvalidTemplate("unsupported header"));
     }
     let total = u32::from_be_bytes(bytes[8..12].try_into().unwrap()) as usize;
@@ -534,7 +624,116 @@ fn parse(bytes: &[u8]) -> Result<IsoTemplate, TemplateError> {
         singular_points: points,
         mean_quality: mean,
         finger_position: pos,
+        format: IsoFormat::Iso2011,
     })
+}
+
+fn parse_2005(bytes: &[u8]) -> Result<IsoTemplate, TemplateError> {
+    if bytes.len() < 30 {
+        return Err(TemplateError::InvalidTemplate("truncated ISO 2005 record"));
+    }
+    let total = u32::from_be_bytes(bytes[8..12].try_into().unwrap()) as usize;
+    if total != bytes.len() || bytes[22] != 1 || bytes[23] != 0 {
+        return Err(TemplateError::InvalidTemplate(
+            "unsupported ISO 2005 record",
+        ));
+    }
+    let pos = finger_position(bytes[24])?;
+    let count = usize::from(bytes[27]);
+    if 28 + count * 6 + 2 != bytes.len() {
+        return Err(TemplateError::InvalidTemplate(
+            "invalid ISO 2005 minutiae length",
+        ));
+    }
+    let mut minutiae = Vec::with_capacity(count);
+    let mut i = 28;
+    for _ in 0..count {
+        let a = u16::from_be_bytes(bytes[i..i + 2].try_into().unwrap());
+        minutiae.push(Minutia {
+            x: a & 0x3fff,
+            y: u16::from_be_bytes(bytes[i + 2..i + 4].try_into().unwrap()) & 0x3fff,
+            kind: MinutiaKind::from_bits(a >> 14)?,
+            angle: bytes[i + 4],
+            quality: bytes[i + 5],
+        });
+        i += 6;
+    }
+    let ext = usize::from(u16::from_be_bytes(bytes[i..i + 2].try_into().unwrap()));
+    i += 2;
+    if i + ext != bytes.len() {
+        return Err(TemplateError::InvalidTemplate(
+            "invalid ISO 2005 extension length",
+        ));
+    }
+    let mut singular_points = Vec::new();
+    if ext > 0 {
+        if ext < 6 || bytes[i..i + 2] != [0, 2] {
+            return Err(TemplateError::InvalidTemplate(
+                "unsupported ISO 2005 extension",
+            ));
+        }
+        let declared = usize::from(u16::from_be_bytes(bytes[i + 2..i + 4].try_into().unwrap()));
+        if declared + 4 != ext && declared != ext {
+            return Err(TemplateError::InvalidTemplate(
+                "invalid ISO 2005 core/delta extension",
+            ));
+        }
+        let mut j = i + 4;
+        let nc = usize::from(bytes[j]);
+        j += 1;
+        for _ in 0..nc {
+            singular_points.push(SingularPoint {
+                kind: SingularPointKind::Core,
+                x: u16::from_be_bytes(bytes[j..j + 2].try_into().unwrap()) & 0x3fff,
+                y: u16::from_be_bytes(bytes[j + 2..j + 4].try_into().unwrap()) & 0x3fff,
+                confidence: 100,
+            });
+            j += 4;
+        }
+        let nd = usize::from(bytes[j]);
+        j += 1;
+        for _ in 0..nd {
+            singular_points.push(SingularPoint {
+                kind: SingularPointKind::Delta,
+                x: u16::from_be_bytes(bytes[j..j + 2].try_into().unwrap()) & 0x3fff,
+                y: u16::from_be_bytes(bytes[j + 2..j + 4].try_into().unwrap()) & 0x3fff,
+                confidence: 100,
+            });
+            j += 4;
+        }
+        if j != bytes.len() {
+            return Err(TemplateError::InvalidTemplate(
+                "trailing ISO 2005 extension data",
+            ));
+        }
+    }
+    Ok(IsoTemplate {
+        bytes: bytes.to_vec(),
+        mean_quality: mean_quality(&minutiae),
+        minutiae,
+        singular_points,
+        finger_position: pos,
+        format: IsoFormat::Iso2005,
+    })
+}
+
+fn finger_position(value: u8) -> Result<FingerPosition, TemplateError> {
+    match value {
+        0 => Ok(FingerPosition::Unknown),
+        1 => Ok(FingerPosition::RightThumb),
+        2 => Ok(FingerPosition::RightIndex),
+        3 => Ok(FingerPosition::RightMiddle),
+        4 => Ok(FingerPosition::RightRing),
+        5 => Ok(FingerPosition::RightLittle),
+        6 => Ok(FingerPosition::LeftThumb),
+        7 => Ok(FingerPosition::LeftIndex),
+        8 => Ok(FingerPosition::LeftMiddle),
+        9 => Ok(FingerPosition::LeftRing),
+        10 => Ok(FingerPosition::LeftLittle),
+        _ => Err(TemplateError::InvalidTemplate(
+            "unsupported finger position",
+        )),
+    }
 }
 
 #[cfg(test)]
@@ -555,10 +754,27 @@ mod tests {
             y: 120,
             confidence: 90,
         }];
-        let bytes = serialize(&ms, &ps, 80, FingerPosition::RightIndex);
+        let bytes = serialize_2011(&ms, &ps, 80, FingerPosition::RightIndex);
         let parsed = IsoTemplate::from_bytes(&bytes).unwrap();
         assert_eq!(parsed.minutiae(), ms);
         assert_eq!(parsed.singular_points()[0].kind, SingularPointKind::Core);
         assert_eq!(&bytes[..8], b"FMR\0\x30\x33\x30\0");
+        assert_eq!(parsed.format(), IsoFormat::Iso2011);
+    }
+
+    #[test]
+    fn iso_2005_round_trip() {
+        let ms = vec![Minutia {
+            x: 10,
+            y: 20,
+            kind: MinutiaKind::RidgeBifurcation,
+            angle: 64,
+            quality: 80,
+        }];
+        let bytes = serialize_2005(&ms, &[], 80, FingerPosition::LeftIndex);
+        let parsed = IsoTemplate::from_bytes(&bytes).unwrap();
+        assert_eq!(parsed.minutiae(), ms);
+        assert_eq!(parsed.format(), IsoFormat::Iso2005);
+        assert_eq!(&bytes[..8], b"FMR\0 20\0");
     }
 }

@@ -95,10 +95,16 @@ To capture and store only an ISO/IEC 19794-2:2011 minutiae template (no image fi
 cargo run --example capture_to_iso_template
 ```
 
-This writes `fingerprint.iso19794`, containing quality-filtered ridge endings and bifurcations.
+This writes `fingerprint-2011.iso19794` and `fingerprint-2005.iso19794`, containing the same
+quality-filtered ridge endings and bifurcations in both interoperable layouts.
 It may also include experimental core/delta estimates when the orientation field is sufficiently
 confident. The template is still sensitive biometric data and should be protected by the consuming
 application.
+
+The default export is ISO/IEC 19794-2:2011. For legacy systems, call
+`frame.extract_iso_template_as(IsoFormat::Iso2005, &options)` to emit
+ISO/IEC 19794-2:2005 + Cor.1:2009. `IsoTemplate::from_bytes` detects and validates either
+normal/off-card ISO revision automatically.
 
 To inspect connected Futronic USB devices and endpoint descriptors without capturing:
 

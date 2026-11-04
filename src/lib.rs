@@ -34,6 +34,6 @@ pub use protocol::{
 };
 #[cfg(feature = "templates")]
 pub use template::{
-    FingerPosition, IsoTemplate, Minutia, MinutiaKind, SingularPoint, SingularPointKind,
+    FingerPosition, IsoFormat, IsoTemplate, Minutia, MinutiaKind, SingularPoint, SingularPointKind,
     TemplateError, TemplateOptions,
 };
