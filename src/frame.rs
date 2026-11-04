@@ -69,6 +69,18 @@ impl RawFrame {
         &self.data
     }
 
+    /// Extracts a quality-gated ISO/IEC 19794-2:2011 fingerprint template.
+    ///
+    /// The template contains minutiae and, when confidently estimated, experimental core/delta
+    /// points. The source image remains in memory; this method never writes it to disk.
+    #[cfg(feature = "templates")]
+    pub fn extract_iso_template(
+        &self,
+        options: &crate::template::TemplateOptions,
+    ) -> Result<crate::template::IsoTemplate, crate::template::TemplateError> {
+        crate::template::extract(self, options)
+    }
+
     /// Recommended target bitrate for standard FBI 15:1 lossy compression (0.75 bpp).
     pub const DEFAULT_WSQ_BITRATE: f32 = 0.75;
 

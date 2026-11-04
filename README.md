@@ -89,6 +89,17 @@ To capture, compress directly to FBI WSQ, and verify reconstructed fidelity:
 cargo run --example capture_to_wsq
 ```
 
+To capture and store only an ISO/IEC 19794-2:2011 minutiae template (no image file):
+
+```sh
+cargo run --example capture_to_iso_template
+```
+
+This writes `fingerprint.iso19794`, containing quality-filtered ridge endings and bifurcations.
+It may also include experimental core/delta estimates when the orientation field is sufficiently
+confident. The template is still sensitive biometric data and should be protected by the consuming
+application.
+
 To inspect connected Futronic USB devices and endpoint descriptors without capturing:
 
 ```sh

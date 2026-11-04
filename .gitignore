@@ -4,5 +4,6 @@ Cargo.lock
 *.png
 *.bin
 *.wsq
+*.iso19794
 *.o
 *.a

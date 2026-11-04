@@ -18,6 +18,8 @@ mod device;
 pub mod error;
 pub mod frame;
 mod protocol;
+#[cfg(feature = "templates")]
+pub mod template;
 #[cfg(feature = "wsq")]
 pub mod wsq;
 
@@ -29,4 +31,9 @@ pub use frame::{resample_bilinear, RawFrame};
 pub use protocol::{
     BULK_CHUNK_SIZE, DEFAULT_IMAGE_DOSE, RAW_FRAME_SIZE, RAW_SENSOR_HEIGHT, RAW_SENSOR_STREAM_SIZE,
     RAW_SENSOR_WIDTH, SENSOR_DPI, SENSOR_HEIGHT, SENSOR_WIDTH,
+};
+#[cfg(feature = "templates")]
+pub use template::{
+    FingerPosition, IsoTemplate, Minutia, MinutiaKind, SingularPoint, SingularPointKind,
+    TemplateError, TemplateOptions,
 };
