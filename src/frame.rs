@@ -69,6 +69,18 @@ impl RawFrame {
         &self.data
     }
 
+    /// Computes the NIST NFIQ2 image-quality score for this frame.
+    ///
+    /// This requires the optional `nfiq2` feature. The frame is assessed entirely in memory;
+    /// no image data is written to disk or transmitted by this method.
+    #[cfg(feature = "nfiq2")]
+    pub fn assess_nfiq2(
+        &self,
+        engine: &crate::nfiq2::Nfiq2,
+    ) -> Result<crate::nfiq2::Nfiq2Assessment, crate::nfiq2::Nfiq2Error> {
+        engine.assess(self)
+    }
+
     /// Extracts a quality-gated ISO/IEC 19794-2:2011 fingerprint template.
     ///
     /// The template contains minutiae and, when confidently estimated, experimental core/delta

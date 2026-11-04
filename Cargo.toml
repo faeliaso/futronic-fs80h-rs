@@ -15,6 +15,9 @@ templates = ["dep:fprint-mindtct"]
 ansi-378 = ["templates"]
 matcher = ["templates"]
 matcher-base64 = ["matcher", "dep:base64"]
+# Links against an externally installed NIST NFIQ2 2.3 library. Set `NFIQ2_DIR`
+# to its installation prefix when enabling this feature.
+nfiq2 = ["dep:cc"]
 
 [dependencies]
 rusb = "0.9"
@@ -45,6 +48,10 @@ required-features = ["matcher"]
 [[example]]
 name = "calibrate_live_match"
 required-features = ["matcher"]
+
+[[example]]
+name = "capture_with_nfiq2_quality"
+required-features = ["nfiq2"]
 
 [dev-dependencies]
 image = { version = "0.25", default-features = false, features = ["png"] }

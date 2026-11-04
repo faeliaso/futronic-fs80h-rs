@@ -131,6 +131,48 @@ profile at 500 DPI with the standard `Vendor Unknown` identifier (`0x0103`); it 
 of ANSI, government, or partner-system certification. Import rejects multi-fingerprint records,
 vendor extensions, and unsupported ridge-count extensions.
 
+## NIST NFIQ2 image quality
+
+The optional `nfiq2` feature scores the uncompressed live frame with the official NIST NFIQ2 2.3
+library before a template is created or stored. NFIQ2 produces a local 0–100 image-utility score
+and actionable image-quality signals; it does not perform liveness detection or establish the
+physical cause of a bad image. In particular, applications may translate insufficient foreground
+to “reposition the finger”, but must not claim that it proves insufficient pressure.
+
+NFIQ2 is not enabled by default because its native library, OpenCV dependency, and model are
+installed separately. Install the NIST NFIQ2 2.3 development package, set `NFIQ2_DIR` to its
+installation prefix (containing `include/` and `lib/`), and pass the path to its model-information
+file when constructing the assessor. The model-info file identifies the random-forest parameter
+file and checksum used for reproducible scoring.
+
+```no_run
+use futronic_fs80h_rs::{FutronicDevice, Nfiq2, Nfiq2Options};
+
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let assessor = Nfiq2::new("/opt/nfiq2/model/model.info", Nfiq2Options::default())?;
+let mut scanner = FutronicDevice::open_first()?;
+let frame = scanner.capture_frame()?;
+let quality = frame.assess_nfiq2(&assessor)?;
+
+if !quality.accepted {
+    // `feedback` can be empty: a low unified score does not always map to one of NFIQ2's four
+    // actionable conditions. Translate it when present, then request another capture either way.
+    eprintln!("Capture rejected (score {}): {:?}", quality.score, quality.feedback);
+    return Ok(());
+}
+// Only persist or extract a template from accepted frames.
+# Ok(())
+# }
+```
+
+The default inclusive minimum score is `50`; set `Nfiq2Options::minimum_score` to recalibrate it
+for the deployment. The library never writes the fingerprint frame to disk and does not transmit
+it. Run the connected-device example with:
+
+```sh
+NFIQ2_DIR=/usr/local/nfiq2 cargo run --features nfiq2 --example capture_with_nfiq2_quality -- /path/to/model.info
+```
+
 ## Local AFIS matching
 
 The default features include a local minutiae matcher for 1:1 verification and linear 1:N search.

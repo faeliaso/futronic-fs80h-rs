@@ -19,6 +19,8 @@ pub mod error;
 pub mod frame;
 #[cfg(feature = "matcher")]
 pub mod matcher;
+#[cfg(feature = "nfiq2")]
+pub mod nfiq2;
 mod protocol;
 #[cfg(feature = "templates")]
 pub mod template;
@@ -34,6 +36,8 @@ pub use frame::{resample_bilinear, RawFrame};
 pub use matcher::{
     CandidateMatch, FingerprintTemplate, MatchResult, Matcher, MatcherError, MatcherOptions,
 };
+#[cfg(feature = "nfiq2")]
+pub use nfiq2::{ActionableQualityFeedback, Nfiq2, Nfiq2Assessment, Nfiq2Error, Nfiq2Options};
 pub use protocol::{
     BULK_CHUNK_SIZE, DEFAULT_IMAGE_DOSE, RAW_FRAME_SIZE, RAW_SENSOR_HEIGHT, RAW_SENSOR_STREAM_SIZE,
     RAW_SENSOR_WIDTH, SENSOR_DPI, SENSOR_HEIGHT, SENSOR_WIDTH,

@@ -6,6 +6,9 @@ fn main() {
         let mut build = cc::Build::new();
         build.include("c_src/include");
         build.define("__NBISLE__", None);
+        // NBIS exposes a generic global named `debug`; namespace it to avoid colliding with
+        // the same legacy symbol in statically linked NFIQ2 distributions.
+        build.define("debug", "wsq_nbis_debug");
         build.warnings(false);
 
         let files = [
@@ -51,5 +54,64 @@ fn main() {
         }
 
         build.compile("wsq_nbis");
+    }
+
+    #[cfg(feature = "nfiq2")]
+    {
+        use std::{env, path::PathBuf};
+
+        println!("cargo:rerun-if-env-changed=NFIQ2_DIR");
+        println!("cargo:rerun-if-changed=c_src/nfiq2_bridge.cpp");
+
+        let prefix = env::var_os("NFIQ2_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                panic!("the nfiq2 feature requires NFIQ2_DIR to point to an NFIQ2 2.3 installation")
+            });
+        let include = prefix.join("include");
+        let lib = prefix.join("lib");
+        if !include.is_dir() || !lib.is_dir() {
+            panic!(
+                "NFIQ2_DIR must contain include/ and lib/ directories (got {})",
+                prefix.display()
+            );
+        }
+
+        cc::Build::new()
+            .cpp(true)
+            .file("c_src/nfiq2_bridge.cpp")
+            .include(include)
+            .warnings(false)
+            .compile("fs80h_nfiq2_bridge");
+        println!("cargo:rustc-link-search=native={}", lib.display());
+        // Official NFIQ2 packages commonly ship `libnfiq2` as a static library. Link its
+        // transitive FingerJet/OpenCV components explicitly when the package supplies them.
+        // Dynamic package variants need only the first entry and harmlessly omit the rest.
+        for library in [
+            "nfiq2",
+            "FRFXLL",
+            "nfir",
+            "opencv_ml",
+            "opencv_imgproc",
+            "opencv_core",
+        ] {
+            println!("cargo:rustc-link-lib={library}");
+        }
+        let opencv_third_party = lib.join("opencv4/3rdparty");
+        if opencv_third_party.is_dir() {
+            println!(
+                "cargo:rustc-link-search=native={}",
+                opencv_third_party.display()
+            );
+            println!("cargo:rustc-link-lib=static=zlib");
+        }
+        #[cfg(target_os = "macos")]
+        {
+            for framework in ["Accelerate", "AppKit", "OpenCL"] {
+                println!("cargo:rustc-link-lib=framework={framework}");
+            }
+            // The NIST macOS package uses `@rpath` for FingerJet FX OSE.
+            println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib.display());
+        }
     }
 }
