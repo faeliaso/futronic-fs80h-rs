@@ -74,6 +74,167 @@ pub enum LfdResearchCaptureStep {
 /// Low auxiliary-frame dose observed in both inspected vendor implementations.
 pub const PREVIEW_LFD_DOSE: u8 = 0x2d;
 
+/// Wraps a register and value into the 8-byte FS80H register-write frame
+/// dispatched by `CFs80CompatibleDevice::InternalSave7ControlBytes`.
+#[must_use]
+pub const fn cmos_register_command(register: u8, value: u8) -> [u8; 8] {
+    [0x40, register, value, 0x00, 0x00, 0x00, 0x00, 0x00]
+}
+
+/// 8-byte command packet used by the vendor's `WriteBL2CMOS` routine to restore
+/// the normal CMOS/backlight state (register 0x4A, value 0x03).
+pub const BL2_CMOS_RESTORE_COMMAND: [u8; 8] = cmos_register_command(0x4a, 0x03);
+
+/// Firmware-memory query recovered from the SDK's FS80H initialization path.
+/// It requests the 64-byte configuration block from which the vendor derives
+/// colored-CMOS values. This constant is documentation only; no public API
+/// sends it yet.
+pub const FIRMWARE_COLOR_CONFIG_QUERY: [u8; 4] = [0xfc, 0x40, 0x00, 0x00];
+
+/// Device-specific colored-CMOS values derived from the FS80H firmware
+/// configuration block. Possessing this profile does not authorize applying
+/// it: no colored-CMOS write API is exposed by this crate.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LfdFirmwareColorConfig {
+    bytes: [u8; 64],
+}
+
+impl LfdFirmwareColorConfig {
+    pub(crate) const fn new(bytes: [u8; 64]) -> Self {
+        Self { bytes }
+    }
+
+    #[must_use]
+    pub const fn bytes(&self) -> &[u8; 64] {
+        &self.bytes
+    }
+
+    /// Returns true if this FS80H firmware configuration satisfies the vendor
+    /// SDK's static gate check `(config[0x19] & 0x81) == 0x01` required to
+    /// execute `WriteBL2CMOS`.
+    #[must_use]
+    pub const fn is_write_bl2_cmos_supported(&self) -> bool {
+        (self.bytes[0x19] & 0x81) == 0x01
+    }
+
+    /// Returns the logical register and value pairs calculated as in the
+    /// vendor `WriteBL2CMOS(1)` routine.
+    #[must_use]
+    pub const fn activation_register_pairs(&self) -> [(u8, u8); 6] {
+        [
+            (0x4a, self.bytes[0x19].wrapping_mul(2) & 0xf0),
+            (0x4b, self.bytes[0x11]),
+            (0x4c, self.bytes[0x14]),
+            (0x4d, self.bytes[0x13]),
+            (0x4e, self.bytes[0x12]),
+            (0x4f, self.bytes[0x22]),
+        ]
+    }
+
+    /// The six 8-byte register writes dispatched by the vendor SDK's
+    /// `WriteBL2CMOS(1)` routine via `InternalSave7ControlBytes`.
+    #[must_use]
+    pub const fn activation_register_commands(&self) -> [[u8; 8]; 6] {
+        let pairs = self.activation_register_pairs();
+        [
+            cmos_register_command(pairs[0].0, pairs[0].1),
+            cmos_register_command(pairs[1].0, pairs[1].1),
+            cmos_register_command(pairs[2].0, pairs[2].1),
+            cmos_register_command(pairs[3].0, pairs[3].1),
+            cmos_register_command(pairs[4].0, pairs[4].1),
+            cmos_register_command(pairs[5].0, pairs[5].1),
+        ]
+    }
+}
+
+/// Static, non-executing model of the colored-CMOS transition used by the
+/// FS80H vendor TLFD path.
+///
+/// The activation values remain unknown because the SDK derives them from
+/// device-specific configuration held in its private object state. This plan
+/// is deliberately not serializable into USB writes until those values are
+/// independently recovered.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LfdColoredCmosDryRunPlan {
+    steps: Vec<LfdColoredCmosDryRunStep>,
+}
+
+impl LfdColoredCmosDryRunPlan {
+    /// Returns the recovered `WriteBL2CMOS` flow around the three auxiliary
+    /// TLFD frames. This method has no USB side effects.
+    #[must_use]
+    pub fn inferred_fs80h() -> Self {
+        Self {
+            steps: vec![
+                LfdColoredCmosDryRunStep::UnknownActivationRegister {
+                    register: 0x4a,
+                    source: "firmware config[0x19]: ((value * 2) & 0xF0)",
+                },
+                LfdColoredCmosDryRunStep::UnknownActivationRegister {
+                    register: 0x4b,
+                    source: "firmware config[0x11]",
+                },
+                LfdColoredCmosDryRunStep::UnknownActivationRegister {
+                    register: 0x4c,
+                    source: "firmware config[0x14]",
+                },
+                LfdColoredCmosDryRunStep::UnknownActivationRegister {
+                    register: 0x4d,
+                    source: "firmware config[0x13]",
+                },
+                LfdColoredCmosDryRunStep::UnknownActivationRegister {
+                    register: 0x4e,
+                    source: "firmware config[0x12]",
+                },
+                LfdColoredCmosDryRunStep::UnknownActivationRegister {
+                    register: 0x4f,
+                    source: "firmware config[0x22]",
+                },
+                LfdColoredCmosDryRunStep::AuxiliaryFrame {
+                    selector: 0x84,
+                    dose: PREVIEW_LFD_DOSE,
+                },
+                LfdColoredCmosDryRunStep::AuxiliaryFrame {
+                    selector: 0x81,
+                    dose: PREVIEW_LFD_DOSE,
+                },
+                LfdColoredCmosDryRunStep::AuxiliaryFrame {
+                    selector: 0x01,
+                    dose: PREVIEW_LFD_DOSE,
+                },
+                LfdColoredCmosDryRunStep::KnownRestore {
+                    command: BL2_CMOS_RESTORE_COMMAND,
+                },
+            ],
+        }
+    }
+
+    #[must_use]
+    pub fn steps(&self) -> &[LfdColoredCmosDryRunStep] {
+        &self.steps
+    }
+
+    /// The plan is incomplete until all activation register values have been
+    /// independently recovered, so it must not be sent to a scanner.
+    #[must_use]
+    pub fn is_safe_to_apply(&self) -> bool {
+        !self.steps.iter().any(|step| {
+            matches!(
+                step,
+                LfdColoredCmosDryRunStep::UnknownActivationRegister { .. }
+            )
+        })
+    }
+}
+
+/// One static-analysis result in a colored-CMOS dry-run plan.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LfdColoredCmosDryRunStep {
+    UnknownActivationRegister { register: u8, source: &'static str },
+    AuxiliaryFrame { selector: u8, dose: u8 },
+    KnownRestore { command: [u8; 8] },
+}
+
 /// Dataset-specific default chosen from the initial ten genuine and ten
 /// four-layer-glove captures. It must be revalidated before each deployment.
 #[cfg(feature = "lfd-experimental-decision")]
@@ -798,6 +959,70 @@ mod tests {
                 LfdResearchCaptureStep::FinalFrame { selector: 0x02 },
                 LfdResearchCaptureStep::FinalFrame { selector: 0x82 },
                 LfdResearchCaptureStep::RestoreColoredCmos,
+            ]
+        );
+    }
+
+    #[test]
+    fn colored_cmos_dry_run_is_incomplete_and_ends_with_known_restore() {
+        let plan = super::LfdColoredCmosDryRunPlan::inferred_fs80h();
+
+        assert!(!plan.is_safe_to_apply());
+        assert_eq!(plan.steps().len(), 10);
+        assert!(matches!(
+            plan.steps().first(),
+            Some(super::LfdColoredCmosDryRunStep::UnknownActivationRegister { register: 0x4a, .. })
+        ));
+        assert_eq!(
+            plan.steps().last(),
+            Some(&super::LfdColoredCmosDryRunStep::KnownRestore {
+                command: super::BL2_CMOS_RESTORE_COMMAND,
+            })
+        );
+        assert_eq!(
+            super::BL2_CMOS_RESTORE_COMMAND,
+            [0x40, 0x4a, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00]
+        );
+        assert_eq!(super::FIRMWARE_COLOR_CONFIG_QUERY, [0xfc, 0x40, 0x00, 0x00]);
+    }
+
+    #[test]
+    fn firmware_color_config_uses_recovered_register_offsets() {
+        let mut bytes = [0_u8; 64];
+        bytes[0x19] = 0x9a;
+        bytes[0x11] = 0x11;
+        bytes[0x14] = 0x14;
+        bytes[0x13] = 0x13;
+        bytes[0x12] = 0x12;
+        bytes[0x22] = 0x22;
+        let config = super::LfdFirmwareColorConfig::new(bytes);
+        assert!(!config.is_write_bl2_cmos_supported());
+
+        let mut supported_bytes = bytes;
+        supported_bytes[0x19] = 0x01;
+        let supported_config = super::LfdFirmwareColorConfig::new(supported_bytes);
+        assert!(supported_config.is_write_bl2_cmos_supported());
+
+        assert_eq!(
+            config.activation_register_pairs(),
+            [
+                (0x4a, 0x30),
+                (0x4b, 0x11),
+                (0x4c, 0x14),
+                (0x4d, 0x13),
+                (0x4e, 0x12),
+                (0x4f, 0x22),
+            ]
+        );
+        assert_eq!(
+            config.activation_register_commands(),
+            [
+                [0x40, 0x4a, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00],
+                [0x40, 0x4b, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00],
+                [0x40, 0x4c, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00],
+                [0x40, 0x4d, 0x13, 0x00, 0x00, 0x00, 0x00, 0x00],
+                [0x40, 0x4e, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00],
+                [0x40, 0x4f, 0x22, 0x00, 0x00, 0x00, 0x00, 0x00],
             ]
         );
     }

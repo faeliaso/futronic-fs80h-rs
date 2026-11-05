@@ -55,6 +55,55 @@ sequence as typed, non-executing Rust data. It is useful for reviewing the
 recovered behavior and for later trace-based tests, without creating a path
 that can accidentally send inferred vendor requests to a scanner.
 
+### Colored-CMOS dry run
+
+The vendor's `WriteBL2CMOS(1)` writes registers `0x4A` through `0x4F` before
+the auxiliary frames. Static analysis of `CFsUsb20t80HDevice::WriteBL2CMOS` and
+`CFs80CompatibleDevice::InternalSave7ControlBytes` in `libScanAPI.so` recovered the
+transport framing, order, normal-state restore command, and activation byte mapping:
+- Every register write is sent as an **8-byte USB bulk OUT frame**:
+  `[0x40, register, value, 0x00, 0x00, 0x00, 0x00, 0x00]`. `0x40` is the opcode
+  for saving control bytes/registers, and bytes 3..7 are zero padding.
+- The normal-state restore command is likewise 8 bytes:
+  `[0x40, 0x4A, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00]`.
+- The SDK reads the 64-byte firmware configuration block with `FC 40 00 00`, then
+  maps offsets `0x19`, `0x11`, `0x14`, `0x13`, `0x12`, and `0x22` respectively
+  to registers `0x4A`–`0x4F`. `0x4A` is transformed as `((config[0x19] * 2) & 0xF0)`.
+
+The following command is intentionally offline: it does not enumerate a
+scanner or use USB.
+
+```sh
+cargo run --features lfd-research --example probe_lfd_colored_cmos -- --dry-run
+```
+
+It prints those unresolved slots and always reports `safe_to_apply=false`.
+No `--apply` mode exists until static analysis independently recovers all six
+activation values and a restore-on-error design is validated.
+
+The read-only firmware query is now available for an isolated FS80H test
+reader:
+
+```sh
+cargo run --features lfd-research --example probe_lfd_colored_cmos -- \
+  --read-firmware-config
+```
+
+It sends only `FC 40 00 00`, reads 64 bytes, and prints the derived register
+pairs. It does not send any colored-CMOS activation register writes.
+
+After verifying the printed profile for the connected test reader, an explicit
+capture mode can apply it, collect the auxiliary triplet, and restore `4A 03`
+even when capture fails:
+
+```sh
+cargo run --features lfd-research --example capture_lfd_colored_cmos -- \
+  --apply-verified-cmos /private/tmp/lfd-colored-cmos
+```
+
+This is still experimental and stores sensitive raw streams. It must not be
+used on a production reader or represented as a certified liveness decision.
+
 ## One-command hardware probe
 
 For an isolated FS80H test reader, the `probe_lfd_auxiliary` example sends one

@@ -14,6 +14,9 @@ pub enum UsbOperation {
     SetDiodes,
     ConfigureFrameMode,
     QueryControlBytes,
+    QueryLfdFirmwareConfig,
+    ConfigureLfdColoredCmos,
+    RestoreLfdColoredCmos,
     ProbeLfdAuxiliaryFrame,
     TriggerFrame,
     ReadFrame,
@@ -32,6 +35,9 @@ impl core::fmt::Display for UsbOperation {
             Self::SetDiodes => "set scanner diodes",
             Self::ConfigureFrameMode => "configure scanner frame mode",
             Self::QueryControlBytes => "query scanner control bytes",
+            Self::QueryLfdFirmwareConfig => "query FS80H LFD firmware configuration",
+            Self::ConfigureLfdColoredCmos => "configure FS80H LFD colored CMOS",
+            Self::RestoreLfdColoredCmos => "restore FS80H LFD colored CMOS",
             Self::ProbeLfdAuxiliaryFrame => "probe an experimental LFD auxiliary frame",
             Self::TriggerFrame => "trigger frame",
             Self::ReadFrame => "read frame",
@@ -80,6 +86,22 @@ pub enum ScannerError {
         width: u16,
         height: u16,
         expected_bytes: usize,
+    },
+
+    #[cfg(feature = "lfd-research")]
+    #[error("FS80H colored-CMOS command {register:#04X} {value:#04X} failed: {message}{restore_status}")]
+    LfdColoredCmosCommand {
+        register: u8,
+        value: u8,
+        message: String,
+        restore_status: String,
+    },
+
+    #[cfg(feature = "lfd-research")]
+    #[error("FS80H colored-CMOS capture failed: {message}{restore_status}")]
+    LfdColoredCmosCaptureWithRestoreFailure {
+        message: String,
+        restore_status: String,
     },
 
     #[cfg(feature = "wsq")]

@@ -9,5 +9,6 @@ calibration.csv
 lfd-research/
 *.lfd-probe.raw
 lfd-auxiliary-probe/
+lfd-colored-cmos/
 *.o
 *.a

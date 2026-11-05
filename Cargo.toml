@@ -68,6 +68,14 @@ name = "probe_lfd_auxiliary_triplet"
 required-features = ["lfd-research"]
 
 [[example]]
+name = "probe_lfd_colored_cmos"
+required-features = ["lfd-research"]
+
+[[example]]
+name = "capture_lfd_colored_cmos"
+required-features = ["lfd-research"]
+
+[[example]]
 name = "analyze_lfd_auxiliary_triplet"
 required-features = ["lfd-research"]
 

@@ -38,9 +38,12 @@ pub use frame::{resample_bilinear, RawFrame};
 pub use lfd::{
     analyze_lfd_auxiliary_frames, analyze_lfd_auxiliary_frames_with_threshold,
     assess_lfd_auxiliary_triplet, LfdAuxiliaryAnalysisError, LfdAuxiliaryFrameMetrics,
-    LfdAuxiliaryTriplet, LfdResearchAcquisitionPlan, LfdResearchAssessment, LfdResearchCaptureStep,
-    LfdResearchCaptureTiming, LfdResearchMetrics, LfdResearchOptions, LfdResearchOutcome,
-    LfdResearchSample, LfdResearchSequence, DEFAULT_AUXILIARY_SIGNAL_THRESHOLD, PREVIEW_LFD_DOSE,
+    LfdAuxiliaryTriplet, LfdColoredCmosDryRunPlan, LfdColoredCmosDryRunStep,
+    LfdFirmwareColorConfig, LfdResearchAcquisitionPlan, LfdResearchAssessment,
+    LfdResearchCaptureStep, LfdResearchCaptureTiming, LfdResearchMetrics, LfdResearchOptions,
+    LfdResearchOutcome, LfdResearchSample, LfdResearchSequence, BL2_CMOS_RESTORE_COMMAND,
+    DEFAULT_AUXILIARY_SIGNAL_THRESHOLD, FIRMWARE_COLOR_CONFIG_QUERY, PREVIEW_LFD_DOSE,
+    cmos_register_command,
 };
 #[cfg(feature = "lfd-experimental-decision")]
 pub use lfd::{

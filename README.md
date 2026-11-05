@@ -256,6 +256,34 @@ These files are sensitive biometric data: obtain subject consent, use encrypted
 storage where appropriate, and delete experimental captures when no longer
 needed.
 
+The recovered colored-CMOS setup used by the vendor's TLFD can be reviewed
+offline without opening a scanner:
+
+```sh
+cargo run --features lfd-research --example probe_lfd_colored_cmos -- --dry-run
+```
+
+It documents the inferred register order but does not transmit it: the
+device-specific activation bytes remain unresolved and the project has no
+colored-CMOS apply mode yet.
+
+To query and print the device-specific values without writing CMOS registers:
+
+```sh
+cargo run --features lfd-research \
+  --example probe_lfd_colored_cmos -- --read-firmware-config
+```
+
+For an isolated test reader only, the verified profile can be applied for one
+auxiliary triplet; the driver restores `4A 03` before returning from either a
+successful or failed capture:
+
+```sh
+cargo run --features lfd-research \
+  --example capture_lfd_colored_cmos -- \
+  --apply-verified-cmos /private/tmp/lfd-colored-cmos
+```
+
 See [`docs/lfd-research.md`](docs/lfd-research.md) for the static-analysis
 evidence and the next investigation milestones.
 

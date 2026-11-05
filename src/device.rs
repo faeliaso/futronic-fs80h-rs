@@ -1,8 +1,8 @@
 use crate::error::{ScannerError, UsbOperation};
 #[cfg(feature = "lfd-research")]
 use crate::lfd::{
-    self, LfdAuxiliaryTriplet, LfdResearchCaptureTiming, LfdResearchOptions, LfdResearchOutcome,
-    LfdResearchSequence,
+    self, LfdAuxiliaryTriplet, LfdFirmwareColorConfig, LfdResearchCaptureTiming,
+    LfdResearchOptions, LfdResearchOutcome, LfdResearchSequence,
 };
 #[cfg(feature = "lfd-experimental-decision")]
 use crate::lfd::{
@@ -420,6 +420,45 @@ impl FutronicDevice {
         })
     }
 
+    /// Reads the FS80H's 64-byte firmware configuration block used by the
+    /// vendor SDK to derive colored-CMOS values for TLFD.
+    ///
+    /// This method is restricted to FS80H and sends only the recovered read
+    /// query `FC 40 00 00`; it does not modify CMOS registers.
+    #[cfg(feature = "lfd-research")]
+    pub fn read_lfd_firmware_color_config(
+        &mut self,
+    ) -> Result<LfdFirmwareColorConfig, ScannerError> {
+        if !lfd::is_lfd_research_supported(&self.info) {
+            return Err(ScannerError::UnsupportedLfdResearch {
+                product_id: self.info.product_id,
+            });
+        }
+        self.flush_bulk_in();
+        self.write_command(
+            &lfd::FIRMWARE_COLOR_CONFIG_QUERY,
+            UsbOperation::QueryLfdFirmwareConfig,
+        )?;
+        // The SDK asks its USB exchange helper for 64 configuration bytes, but
+        // the FS80H can place a larger complete bulk packet on the endpoint.
+        // Receive it into the same 512-byte envelope used by the descriptor
+        // query, then retain the first 64 bytes copied by SDK initialization.
+        let mut response = [0_u8; 512];
+        let received = self
+            .handle
+            .read_bulk(self.bulk_in_endpoint, &mut response, DEFAULT_TIMEOUT)
+            .map_err(|error| usb_error(UsbOperation::QueryLfdFirmwareConfig, error))?;
+        if received < 64 {
+            return Err(ScannerError::IncompleteResponse {
+                received,
+                expected: 64,
+            });
+        }
+        let mut bytes = [0_u8; 64];
+        bytes.copy_from_slice(&response[..64]);
+        Ok(LfdFirmwareColorConfig::new(bytes))
+    }
+
     /// Captures the three inferred FS80H auxiliary channels in vendor order.
     ///
     /// This opt-in research path sends three unvalidated `0x37` requests using
@@ -438,6 +477,79 @@ impl FutronicDevice {
             selector_81,
             selector_01,
         ))
+    }
+
+    /// Captures the inferred FS80H auxiliary triplet with the vendor's
+    /// recovered colored-CMOS configuration enabled.
+    ///
+    /// This is an opt-in research operation. It first reads the device-specific
+    /// firmware profile, writes registers `0x4A` through `0x4F` using 8-byte
+    /// frames `[0x40, reg, val, 0, 0, 0, 0, 0]`, captures the three auxiliary
+    /// frames, and always attempts the vendor restore command `40 4A 03 ...`
+    /// before returning.
+    #[cfg(feature = "lfd-research")]
+    pub fn capture_lfd_colored_cmos_triplet(
+        &mut self,
+    ) -> Result<LfdAuxiliaryTriplet, ScannerError> {
+        let config = self.read_lfd_firmware_color_config()?;
+        let setup_result: Result<LfdAuxiliaryTriplet, (Option<(u8, u8)>, ScannerError)> = (|| {
+            for command in config.activation_register_commands() {
+                self.write_command(&command, UsbOperation::ConfigureLfdColoredCmos)
+                    .map_err(|error| (Some((command[1], command[2])), error))?;
+                self.flush_bulk_in();
+                std::thread::sleep(std::time::Duration::from_millis(35));
+            }
+            self.capture_lfd_auxiliary_triplet(0)
+                .map_err(|error| (None, error))
+        })();
+
+        self.flush_bulk_in();
+        std::thread::sleep(std::time::Duration::from_millis(35));
+
+        let restore_result = self
+            .write_command(
+                &lfd::BL2_CMOS_RESTORE_COMMAND,
+                UsbOperation::RestoreLfdColoredCmos,
+            );
+        self.flush_bulk_in();
+
+        match setup_result {
+            Ok(triplet) => match restore_result {
+                Ok(()) => Ok(triplet),
+                Err(error) => Err(ScannerError::LfdColoredCmosCommand {
+                    register: lfd::BL2_CMOS_RESTORE_COMMAND[1],
+                    value: lfd::BL2_CMOS_RESTORE_COMMAND[2],
+                    message: error.to_string(),
+                    restore_status: "; WARNING: restore command failed; scanner may remain in special optical state (reconnect USB)".to_string(),
+                }),
+            },
+            Err((failed_command, error)) => {
+                let (restore_ok, restore_status) = match restore_result {
+                    Ok(()) => (true, " (restore 40 4A 03 succeeded)".to_string()),
+                    Err(restore_error) => (
+                        false,
+                        format!(
+                            "; CRITICAL: RESTORE 40 4A 03 ALSO FAILED: {restore_error}. Scanner remains in special optical state; physical USB power cycle required"
+                        ),
+                    ),
+                };
+                if let Some((register, value)) = failed_command {
+                    Err(ScannerError::LfdColoredCmosCommand {
+                        register,
+                        value,
+                        message: error.to_string(),
+                        restore_status,
+                    })
+                } else if !restore_ok {
+                    Err(ScannerError::LfdColoredCmosCaptureWithRestoreFailure {
+                        message: error.to_string(),
+                        restore_status,
+                    })
+                } else {
+                    Err(error)
+                }
+            }
+        }
     }
 
     /// Captures and evaluates one opt-in experimental biometric-signal session.
@@ -749,5 +861,29 @@ mod tests {
     fn uses_the_recovered_get_frame_gain_sequence() {
         assert_eq!(frame_mode_setup_command(166), [0x49, 0xD3]);
         assert_eq!(frame_mode_reset_command(), [0x49, 0x04]);
+    }
+
+    #[cfg(feature = "lfd-research")]
+    #[test]
+    fn colored_cmos_error_formats_diagnostic_and_restore_status() {
+        let err = ScannerError::LfdColoredCmosCommand {
+            register: 0x4b,
+            value: 0x02,
+            message: "timed out".to_string(),
+            restore_status: "; RESTORE 40 4A 03 ALSO FAILED: timed out. Scanner remains in special optical state; physical USB power cycle required".to_string(),
+        };
+        let formatted = err.to_string();
+        assert!(formatted.contains("0x4B"));
+        assert!(formatted.contains("0x02"));
+        assert!(formatted.contains("timed out"));
+        assert!(formatted.contains("RESTORE 40 4A 03 ALSO FAILED"));
+
+        let capture_err = ScannerError::LfdColoredCmosCaptureWithRestoreFailure {
+            message: "endpoint stalled".to_string(),
+            restore_status: "; RESTORE 40 4A 03 ALSO FAILED: timed out".to_string(),
+        };
+        let formatted_capture = capture_err.to_string();
+        assert!(formatted_capture.contains("endpoint stalled"));
+        assert!(formatted_capture.contains("RESTORE 40 4A 03 ALSO FAILED"));
     }
 }
