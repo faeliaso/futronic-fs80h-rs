@@ -18,6 +18,12 @@ matcher-base64 = ["matcher", "dep:base64"]
 # Links against an externally installed NIST NFIQ2 2.3 library. Set `NFIQ2_DIR`
 # to its installation prefix when enabling this feature.
 nfiq2 = ["dep:cc"]
+# Experimental FS80H-only acquisition telemetry for researching, but not claiming,
+# proprietary live-finger detection behavior.
+lfd-research = []
+# Opt-in, dataset-specific biometric-signal decision built from LFD research
+# metrics. It is disabled by default and is not equivalent to vendor TLFD.
+lfd-experimental-decision = ["lfd-research"]
 
 [dependencies]
 rusb = "0.9"
@@ -48,6 +54,26 @@ required-features = ["matcher"]
 [[example]]
 name = "calibrate_live_match"
 required-features = ["matcher"]
+
+[[example]]
+name = "capture_lfd_research"
+required-features = ["lfd-research"]
+
+[[example]]
+name = "probe_lfd_auxiliary"
+required-features = ["lfd-research"]
+
+[[example]]
+name = "probe_lfd_auxiliary_triplet"
+required-features = ["lfd-research"]
+
+[[example]]
+name = "analyze_lfd_auxiliary_triplet"
+required-features = ["lfd-research"]
+
+[[example]]
+name = "evaluate_lfd_experimental"
+required-features = ["lfd-experimental-decision"]
 
 [[example]]
 name = "capture_with_nfiq2_quality"

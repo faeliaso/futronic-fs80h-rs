@@ -6,5 +6,8 @@ Cargo.lock
 *.wsq
 *.iso19794
 calibration.csv
+lfd-research/
+*.lfd-probe.raw
+lfd-auxiliary-probe/
 *.o
 *.a

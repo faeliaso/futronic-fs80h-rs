@@ -1,4 +1,14 @@
 use crate::error::{ScannerError, UsbOperation};
+#[cfg(feature = "lfd-research")]
+use crate::lfd::{
+    self, LfdAuxiliaryTriplet, LfdResearchCaptureTiming, LfdResearchOptions, LfdResearchOutcome,
+    LfdResearchSequence,
+};
+#[cfg(feature = "lfd-experimental-decision")]
+use crate::lfd::{
+    decide_lfd_experimental, LfdExperimentalDecisionOptions, LfdExperimentalEvaluation,
+    LfdExperimentalPolicy,
+};
 use crate::protocol::{
     is_supported_product, BULK_CHUNK_SIZE, DEFAULT_IMAGE_DOSE, DEFAULT_TIMEOUT,
     EXPECTED_BULK_IN_ENDPOINT, EXPECTED_BULK_OUT_ENDPOINT, FRAME_CHUNK_TIMEOUT,
@@ -190,6 +200,15 @@ impl FutronicDevice {
     /// biometric frame, and restores the gain register to its idle value even if
     /// capture fails.
     pub fn capture_frame_with_frame_mode(&mut self, dose: u8) -> Result<RawFrame, ScannerError> {
+        let stream = self.capture_raw_sensor_stream_with_frame_mode(dose)?;
+        RawFrame::from_raw_sensor_stream(&stream)
+    }
+
+    /// Captures a raw CMOS sensor stream using the recovered `GetFrame` setup.
+    fn capture_raw_sensor_stream_with_frame_mode(
+        &mut self,
+        dose: u8,
+    ) -> Result<Vec<u8>, ScannerError> {
         let setup = frame_mode_setup_command(dose);
         self.write_command(&setup, UsbOperation::ConfigureFrameMode)?;
 
@@ -213,7 +232,130 @@ impl FutronicDevice {
         match stream_result {
             Ok(stream) => {
                 restore_result?;
-                RawFrame::from_raw_sensor_stream(&stream)
+                Ok(stream)
+            }
+            Err(error) => {
+                let _ = restore_result;
+                Err(error)
+            }
+        }
+    }
+
+    /// Collects a timed sequence of FS80H raw sensor streams for LFD research.
+    ///
+    /// This method neither enables nor implements Futronic TLFD. It only records data through
+    /// the currently recovered capture protocol and derives descriptive temporal statistics.
+    /// The FS81H is rejected because its manufacturer does not support LFD on that model.
+    #[cfg(feature = "lfd-research")]
+    pub fn capture_lfd_research_sequence(
+        &mut self,
+        options: LfdResearchOptions,
+    ) -> Result<LfdResearchOutcome, ScannerError> {
+        if !lfd::is_lfd_research_supported(&self.info) {
+            return Ok(LfdResearchOutcome::Unsupported {
+                product_id: self.info.product_id,
+            });
+        }
+        if options.sample_count < 2 {
+            return Ok(LfdResearchOutcome::InsufficientSamples {
+                requested: options.sample_count,
+            });
+        }
+
+        // Capture the vendor-initialization responses once per research sequence so that
+        // recordings can later be grouped by firmware/device behavior.
+        let control_bytes = self.read_control_bytes()?;
+        let descriptor_bytes = self.read_descriptor_bytes()?;
+
+        // Do not retain warm-up streams: they can be affected by gain and optical settling,
+        // while still containing sensitive biometric data.
+        for _ in 0..options.warmup_count {
+            let _ = self.capture_raw_sensor_stream_with_frame_mode_timed(options.dose)?;
+        }
+
+        let started = std::time::Instant::now();
+        let mut samples = Vec::with_capacity(options.sample_count);
+        for index in 0..options.sample_count {
+            let capture = self.capture_raw_sensor_stream_with_frame_mode_timed(options.dose)?;
+            samples.push(lfd::sample(
+                started.elapsed(),
+                capture.timing,
+                capture.stream,
+            ));
+            if index + 1 < options.sample_count {
+                std::thread::sleep(options.inter_sample_delay);
+            }
+        }
+        Ok(LfdResearchOutcome::Acquired(LfdResearchSequence::new(
+            self.info.clone(),
+            control_bytes,
+            descriptor_bytes,
+            options.warmup_count,
+            options.dose,
+            samples,
+        )))
+    }
+
+    #[cfg(feature = "lfd-research")]
+    fn capture_raw_sensor_stream_with_frame_mode_timed(
+        &mut self,
+        dose: u8,
+    ) -> Result<TimedRawSensorStream, ScannerError> {
+        let total_started = std::time::Instant::now();
+        let setup_started = std::time::Instant::now();
+        let setup = frame_mode_setup_command(dose);
+        self.write_command(&setup, UsbOperation::ConfigureFrameMode)?;
+        let configure_gain = setup_started.elapsed();
+
+        let settle_started = std::time::Instant::now();
+        std::thread::sleep(std::time::Duration::from_millis(60));
+        let sensor_settle = settle_started.elapsed();
+
+        let flush_started = std::time::Instant::now();
+        self.flush_bulk_in();
+        let flush_bulk_in = flush_started.elapsed();
+
+        let trigger_started = std::time::Instant::now();
+        self.trigger_frame(dose)?;
+        let trigger_frame = trigger_started.elapsed();
+
+        let read_started = std::time::Instant::now();
+        let mut first_packet_after_trigger = None;
+        let endpoint = self.bulk_in_endpoint;
+        let stream_result = read_complete_frame(RAW_SENSOR_STREAM_SIZE, |chunk| {
+            let count = self
+                .handle
+                .read_bulk(endpoint, chunk, FRAME_CHUNK_TIMEOUT)
+                .map_err(|error| usb_error(UsbOperation::ReadFrame, error))?;
+            if count > 0 && first_packet_after_trigger.is_none() {
+                first_packet_after_trigger = Some(trigger_started.elapsed());
+            }
+            Ok(count)
+        });
+        let read_stream = read_started.elapsed();
+
+        let restore_started = std::time::Instant::now();
+        let restore = frame_mode_reset_command();
+        let restore_result = self.write_command(&restore, UsbOperation::ConfigureFrameMode);
+        let restore_gain = restore_started.elapsed();
+
+        match stream_result {
+            Ok(stream) => {
+                restore_result?;
+                Ok(TimedRawSensorStream {
+                    stream,
+                    timing: LfdResearchCaptureTiming {
+                        configure_gain,
+                        sensor_settle,
+                        flush_bulk_in,
+                        trigger_frame,
+                        first_packet_after_trigger: first_packet_after_trigger
+                            .expect("a complete stream has at least one packet"),
+                        read_stream,
+                        restore_gain,
+                        total: total_started.elapsed(),
+                    },
+                })
             }
             Err(error) => {
                 let _ = restore_result;
@@ -233,6 +375,93 @@ impl FutronicDevice {
             self.handle
                 .read_bulk(endpoint, chunk, FRAME_CHUNK_TIMEOUT)
                 .map_err(|error| usb_error(UsbOperation::ReadFrame, error))
+        })
+    }
+
+    /// Sends one explicitly requested, unvalidated FS80H TLFD auxiliary-frame request.
+    ///
+    /// This is a diagnostic probe for validating a USB trace, not a liveness
+    /// implementation. It deliberately does not enable the vendor's colored CMOS
+    /// register sequence because the required per-device register values are not
+    /// yet independently recovered. The caller must use a profile and geometry
+    /// obtained from a matching trace. A failed probe may require reopening the
+    /// scanner or reconnecting it before normal acquisition resumes.
+    #[cfg(feature = "lfd-research")]
+    pub fn probe_lfd_auxiliary_frame(
+        &mut self,
+        selector: u8,
+        profile: u8,
+        width: u16,
+        height: u16,
+    ) -> Result<Vec<u8>, ScannerError> {
+        if !lfd::is_lfd_research_supported(&self.info) {
+            return Err(ScannerError::UnsupportedLfdResearch {
+                product_id: self.info.product_id,
+            });
+        }
+
+        let expected_len = usize::from(width) * usize::from(height);
+        if expected_len != RAW_SENSOR_STREAM_SIZE {
+            return Err(ScannerError::UnexpectedLfdProbeGeometry {
+                width,
+                height,
+                expected_bytes: RAW_SENSOR_STREAM_SIZE,
+            });
+        }
+
+        self.flush_bulk_in();
+        let command = lfd_auxiliary_frame_command(selector, profile, width, height);
+        self.write_command(&command, UsbOperation::ProbeLfdAuxiliaryFrame)?;
+        let endpoint = self.bulk_in_endpoint;
+        read_complete_frame(expected_len, |chunk| {
+            self.handle
+                .read_bulk(endpoint, chunk, FRAME_CHUNK_TIMEOUT)
+                .map_err(|error| usb_error(UsbOperation::ProbeLfdAuxiliaryFrame, error))
+        })
+    }
+
+    /// Captures the three inferred FS80H auxiliary channels in vendor order.
+    ///
+    /// This opt-in research path sends three unvalidated `0x37` requests using
+    /// the supplied profile. It does not enable the vendor colored-CMOS
+    /// register sequence and does not perform a live/fake decision.
+    #[cfg(feature = "lfd-research")]
+    pub fn capture_lfd_auxiliary_triplet(
+        &mut self,
+        profile: u8,
+    ) -> Result<LfdAuxiliaryTriplet, ScannerError> {
+        let selector_84 = self.probe_lfd_auxiliary_frame(0x84, profile, 384, 800)?;
+        let selector_81 = self.probe_lfd_auxiliary_frame(0x81, profile, 384, 800)?;
+        let selector_01 = self.probe_lfd_auxiliary_frame(0x01, profile, 384, 800)?;
+        Ok(LfdAuxiliaryTriplet::new(
+            selector_84,
+            selector_81,
+            selector_01,
+        ))
+    }
+
+    /// Captures and evaluates one opt-in experimental biometric-signal session.
+    ///
+    /// The policy is supplied by the caller so its calibration identity and
+    /// threshold can be audited and replaced without changing driver code.
+    #[cfg(feature = "lfd-experimental-decision")]
+    pub fn evaluate_lfd_experimental(
+        &mut self,
+        policy: &LfdExperimentalPolicy,
+    ) -> Result<LfdExperimentalEvaluation, ScannerError> {
+        let triplet = self.capture_lfd_auxiliary_triplet(0)?;
+        let metrics = triplet.metrics();
+        let decision = decide_lfd_experimental(
+            &triplet,
+            LfdExperimentalDecisionOptions {
+                minimum_dark_subtracted_correlation: policy.minimum_dark_subtracted_correlation,
+            },
+        );
+        Ok(LfdExperimentalEvaluation {
+            device: self.info.clone(),
+            calibration_id: policy.calibration_id.clone(),
+            decision,
+            metrics,
         })
     }
 
@@ -284,6 +513,12 @@ impl FutronicDevice {
             })
         }
     }
+}
+
+#[cfg(feature = "lfd-research")]
+struct TimedRawSensorStream {
+    stream: Vec<u8>,
+    timing: LfdResearchCaptureTiming,
 }
 
 impl Drop for FutronicDevice {
@@ -351,6 +586,27 @@ fn frame_mode_setup_command(dose: u8) -> [u8; 2] {
 
 fn frame_mode_reset_command() -> [u8; 2] {
     [SET_FRAME_MODE_GAIN, FRAME_MODE_GAIN_RESET]
+}
+
+#[cfg(feature = "lfd-research")]
+fn lfd_auxiliary_frame_command(selector: u8, profile: u8, width: u16, height: u16) -> [u8; 13] {
+    let [width_high, width_low] = width.to_be_bytes();
+    let [height_high, height_low] = height.to_be_bytes();
+    [
+        0x37,
+        crate::lfd::PREVIEW_LFD_DOSE,
+        selector,
+        0x01,
+        profile,
+        width_high,
+        width_low,
+        height_high,
+        height_low,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+    ]
 }
 
 #[cfg(target_os = "linux")]
@@ -462,6 +718,15 @@ mod tests {
     #[test]
     fn uses_the_recovered_variable_dose_bulk_command() {
         assert_eq!(capture_command(0x80), [0x6A, 0x80]);
+    }
+
+    #[cfg(feature = "lfd-research")]
+    #[test]
+    fn serializes_the_inferred_auxiliary_frame_request() {
+        assert_eq!(
+            super::lfd_auxiliary_frame_command(0x84, 0, 384, 800),
+            [0x37, 0x2d, 0x84, 0x01, 0x00, 0x01, 0x80, 0x03, 0x20, 0x00, 0x00, 0x00, 0x00,]
+        );
     }
 
     #[test]

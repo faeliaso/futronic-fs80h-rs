@@ -17,6 +17,8 @@
 mod device;
 pub mod error;
 pub mod frame;
+#[cfg(feature = "lfd-research")]
+pub mod lfd;
 #[cfg(feature = "matcher")]
 pub mod matcher;
 #[cfg(feature = "nfiq2")]
@@ -32,6 +34,20 @@ pub use device::{DeviceInfo, FutronicDevice};
 pub use error::WsqError;
 pub use error::{ScannerError, UsbOperation};
 pub use frame::{resample_bilinear, RawFrame};
+#[cfg(feature = "lfd-research")]
+pub use lfd::{
+    analyze_lfd_auxiliary_frames, analyze_lfd_auxiliary_frames_with_threshold,
+    assess_lfd_auxiliary_triplet, LfdAuxiliaryAnalysisError, LfdAuxiliaryFrameMetrics,
+    LfdAuxiliaryTriplet, LfdResearchAcquisitionPlan, LfdResearchAssessment, LfdResearchCaptureStep,
+    LfdResearchCaptureTiming, LfdResearchMetrics, LfdResearchOptions, LfdResearchOutcome,
+    LfdResearchSample, LfdResearchSequence, DEFAULT_AUXILIARY_SIGNAL_THRESHOLD, PREVIEW_LFD_DOSE,
+};
+#[cfg(feature = "lfd-experimental-decision")]
+pub use lfd::{
+    decide_lfd_experimental, LfdExperimentalDecision, LfdExperimentalDecisionOptions,
+    LfdExperimentalEvaluation, LfdExperimentalPolicy, LfdExperimentalPolicyError,
+    DEFAULT_EXPERIMENTAL_MIN_CORRELATION,
+};
 #[cfg(feature = "matcher")]
 pub use matcher::{
     CandidateMatch, FingerprintTemplate, MatchResult, Matcher, MatcherError, MatcherOptions,

@@ -14,6 +14,7 @@ pub enum UsbOperation {
     SetDiodes,
     ConfigureFrameMode,
     QueryControlBytes,
+    ProbeLfdAuxiliaryFrame,
     TriggerFrame,
     ReadFrame,
 }
@@ -31,6 +32,7 @@ impl core::fmt::Display for UsbOperation {
             Self::SetDiodes => "set scanner diodes",
             Self::ConfigureFrameMode => "configure scanner frame mode",
             Self::QueryControlBytes => "query scanner control bytes",
+            Self::ProbeLfdAuxiliaryFrame => "probe an experimental LFD auxiliary frame",
             Self::TriggerFrame => "trigger frame",
             Self::ReadFrame => "read frame",
         };
@@ -67,6 +69,18 @@ pub enum ScannerError {
 
     #[error("incomplete USB command write: sent {written} of {expected} bytes")]
     IncompleteCommand { written: usize, expected: usize },
+
+    #[cfg(feature = "lfd-research")]
+    #[error("LFD research is unsupported for product ID {product_id:#06X}; only FS80H (0x0020) is allowed")]
+    UnsupportedLfdResearch { product_id: u16 },
+
+    #[cfg(feature = "lfd-research")]
+    #[error("unvalidated LFD probe geometry {width}x{height} does not match the known {expected_bytes}-byte FS80H stream")]
+    UnexpectedLfdProbeGeometry {
+        width: u16,
+        height: u16,
+        expected_bytes: usize,
+    },
 
     #[cfg(feature = "wsq")]
     #[error(transparent)]

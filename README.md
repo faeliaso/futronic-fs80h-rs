@@ -230,6 +230,61 @@ To capture with the green status diode enabled:
 cargo run --example capture_with_green_diode
 ```
 
+## Experimental LFD research
+
+The `lfd-research` feature is an FS80H-only data-collection aid for researching
+the vendor's proprietary Traditional Live Finger Detection (TLFD). It does not
+enable the proprietary LFD mode, return a liveness score, or accept/reject a
+finger as live. In particular, it must not be used as an anti-spoof control.
+
+It records a short, timestamped sequence of unresampled 384x800 CMOS streams
+using the recovered frame-mode acquisition path, the known control/descriptor
+responses, host-side timing for every capture phase, and descriptive per-stream
+intensity and adjacent-frame-difference measurements. FS81H is reported as
+unsupported because the model has no manufacturer LFD capability.
+
+The default performs two warm-up captures without retaining their streams, then
+records four samples. This reduces gain/illumination settling from contaminating
+the retained sequence; it is not a liveness check.
+
+```sh
+cargo run --features lfd-research --example capture_lfd_research -- lfd-research
+```
+
+The output directory contains raw fingerprint streams and is ignored by Git.
+These files are sensitive biometric data: obtain subject consent, use encrypted
+storage where appropriate, and delete experimental captures when no longer
+needed.
+
+See [`docs/lfd-research.md`](docs/lfd-research.md) for the static-analysis
+evidence and the next investigation milestones.
+
+### Opt-in experimental biometric-signal gate
+
+The separate `lfd-experimental-decision` feature adds an FS80H-only,
+dataset-specific gate over the recovered three-channel auxiliary capture. It
+reports `biometric_signal_present` or `insufficient_biometric_signal` from a
+versioned external calibration policy. It is disabled by default, does not
+claim to implement Futronic TLFD, and is not a certified live-finger or
+anti-spoof control.
+
+The included initial policy was fitted only to the project's genuine-finger and
+four-layer-medical-glove research captures. Copy and revalidate it for every
+environment; do not use its threshold as a general fraud-detection setting.
+
+```sh
+cargo run --features lfd-experimental-decision \
+  --example evaluate_lfd_experimental -- \
+  --enable-experimental-decision \
+  config/lfd-experimental.example.conf \
+  /private/tmp/lfd-evaluation
+```
+
+The evaluator writes only `experimental-report.txt`, containing the calibration
+identifier, scanner product ID, threshold, measured correlation, and result.
+It does not retain raw biometric streams. Use the explicitly named probe
+examples only when raw capture has been authorized and secured.
+
 ## Development checks
 
 ```sh
