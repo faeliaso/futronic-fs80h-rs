@@ -1,7 +1,10 @@
 //! Classical computer vision minutiae extraction, visual annotation, and NIST BOZORTH3 matching.
 
 pub mod binarize;
+pub mod bozorth3;
 pub mod crossing_number;
+#[cfg(feature = "mcc")]
+pub mod mcc;
 pub mod render;
 pub mod thinning;
 

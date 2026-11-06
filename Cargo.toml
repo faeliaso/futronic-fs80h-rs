@@ -9,13 +9,15 @@ keywords = ["biometrics", "fingerprint", "usb", "futronic", "driver", "wsq"]
 categories = ["hardware-support"]
 
 [features]
-default = ["wsq", "templates", "ansi-378", "matcher", "matcher-base64", "biometric-core"]
+default = ["wsq", "templates", "ansi-378", "matcher", "matcher-base64", "biometric-core", "mcc"]
 wsq = ["dep:cc"]
 templates = ["dep:fprint-mindtct"]
 ansi-378 = ["templates"]
 matcher = ["templates"]
 matcher-base64 = ["matcher", "dep:base64"]
 biometric-core = ["dep:fprint-bozorth3", "dep:image", "dep:imageproc"]
+serde = ["dep:serde"]
+mcc = ["biometric-core", "dep:rayon", "serde"]
 # Links against an externally installed NIST NFIQ2 2.3 library. Set `NFIQ2_DIR`
 # to its installation prefix when enabling this feature.
 nfiq2 = ["dep:cc"]
@@ -35,6 +37,8 @@ fprint-bozorth3 = { version = "0.1", optional = true }
 image = { version = "0.25", features = ["png"], optional = true }
 imageproc = { version = "0.25", default-features = false, optional = true }
 base64 = { version = "0.22", optional = true }
+rayon = { version = "1.10", optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
 
 [build-dependencies]
 cc = { version = "1.0", optional = true }
@@ -95,5 +99,19 @@ required-features = ["nfiq2"]
 name = "capture_and_match"
 required-features = ["biometric-core"]
 
+[[example]]
+name = "capture_and_mcc_match"
+required-features = ["mcc"]
+
+[[example]]
+name = "verify_two_fingers_mcc"
+required-features = ["mcc"]
+
 [dev-dependencies]
 image = { version = "0.25", default-features = false, features = ["png"] }
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "mcc_benchmark"
+harness = false
+required-features = ["mcc"]

@@ -41,6 +41,8 @@ pub use biometric_core::{
     extract_minutiae, render_minutiae_overlay, render_minutiae_overlay_inverted, BiometricError,
     BiometricMinutia, MinutiaType,
 };
+#[cfg(feature = "mcc")]
+pub use biometric_core::mcc;
 #[cfg(feature = "lfd-research")]
 pub use lfd::{
     analyze_lfd_auxiliary_frames, analyze_lfd_auxiliary_frames_with_threshold,
