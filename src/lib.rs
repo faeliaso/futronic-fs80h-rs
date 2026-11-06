@@ -19,6 +19,8 @@ pub mod error;
 pub mod frame;
 #[cfg(feature = "lfd-research")]
 pub mod lfd;
+#[cfg(feature = "biometric-core")]
+pub mod biometric_core;
 #[cfg(feature = "matcher")]
 pub mod matcher;
 #[cfg(feature = "nfiq2")]
@@ -34,6 +36,11 @@ pub use device::{DeviceInfo, FutronicDevice};
 pub use error::WsqError;
 pub use error::{ScannerError, UsbOperation};
 pub use frame::{resample_bilinear, RawFrame};
+#[cfg(feature = "biometric-core")]
+pub use biometric_core::{
+    extract_minutiae, render_minutiae_overlay, render_minutiae_overlay_inverted, BiometricError,
+    BiometricMinutia, MinutiaType,
+};
 #[cfg(feature = "lfd-research")]
 pub use lfd::{
     analyze_lfd_auxiliary_frames, analyze_lfd_auxiliary_frames_with_threshold,
