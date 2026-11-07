@@ -28,6 +28,17 @@ pub struct DeviceInfo {
     pub product_name: Option<String>,
 }
 
+impl DeviceInfo {
+    /// Returns the USB device identifier ([`crate::discovery::DeviceId`]) corresponding to this scanner.
+    #[must_use]
+    pub const fn id(&self) -> crate::discovery::DeviceId {
+        crate::discovery::DeviceId {
+            bus_number: self.bus_number,
+            address: self.address,
+        }
+    }
+}
+
 /// Configuration settings governing automated finger presence detection and capture.
 #[derive(Debug, Clone)]
 pub struct AutoCaptureOptions {
@@ -144,7 +155,25 @@ impl FutronicDevice {
         Err(ScannerError::DeviceNotFound)
     }
 
-    fn open_device(
+    /// Lists all supported Futronic scanners currently connected to the USB bus.
+    pub fn list_devices() -> Result<Vec<crate::discovery::DiscoveredDevice>, ScannerError> {
+        crate::discovery::list_devices()
+    }
+
+    /// Opens a specific Futronic scanner by its USB device ID.
+    pub fn open_by_id(id: &crate::discovery::DeviceId) -> Result<Self, ScannerError> {
+        crate::discovery::open_device_by_id(id)
+    }
+
+    /// Opens the connected Futronic scanner if exactly one is present.
+    ///
+    /// If multiple scanners are connected, returns [`ScannerError::MultipleDevicesFound`]
+    /// with the list of discovered devices so the caller can select which one to open.
+    pub fn open_single() -> Result<Self, ScannerError> {
+        crate::discovery::open_single_device()
+    }
+
+    pub(crate) fn open_device(
         device: Device<GlobalContext>,
         descriptor: rusb::DeviceDescriptor,
         interface_number: u8,
@@ -894,7 +923,7 @@ impl Drop for FutronicDevice {
     }
 }
 
-fn find_capture_interface(device: &Device<GlobalContext>) -> Result<(u8, u8, u8), ScannerError> {
+pub(crate) fn find_capture_interface(device: &Device<GlobalContext>) -> Result<(u8, u8, u8), ScannerError> {
     let config = device
         .active_config_descriptor()
         .map_err(|error| usb_error(UsbOperation::ReadDescriptor, error))?;
@@ -988,7 +1017,7 @@ fn detach_kernel_driver(
     Ok(active)
 }
 
-fn usb_error(operation: UsbOperation, error: rusb::Error) -> ScannerError {
+pub(crate) fn usb_error(operation: UsbOperation, error: rusb::Error) -> ScannerError {
     if error == rusb::Error::Timeout {
         ScannerError::Timeout
     } else {

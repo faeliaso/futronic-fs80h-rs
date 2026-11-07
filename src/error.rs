@@ -52,6 +52,12 @@ pub enum ScannerError {
     #[error("no Futronic FS80H/FS81H scanner was found on the USB bus")]
     DeviceNotFound,
 
+    #[error("scanner with ID '{0}' was not found on the USB bus")]
+    DeviceWithIdNotFound(crate::discovery::DeviceId),
+
+    #[error("multiple Futronic scanners found ({}); specify a device ID using open_by_id", .0.len())]
+    MultipleDevicesFound(Vec<crate::discovery::DiscoveredDevice>),
+
     #[error("USB operation '{operation}' failed: {message}")]
     Usb {
         operation: UsbOperation,

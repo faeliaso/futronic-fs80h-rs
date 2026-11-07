@@ -17,6 +17,7 @@
 #[cfg(feature = "biometric-core")]
 pub mod biometric_core;
 mod device;
+pub mod discovery;
 pub mod error;
 pub mod frame;
 #[cfg(feature = "lfd-research")]
@@ -40,6 +41,10 @@ pub use biometric_core::{
     BiometricMinutia, MinutiaType,
 };
 pub use device::{AutoCaptureOptions, CaptureFeedback, DeviceInfo, FutronicDevice};
+pub use discovery::{
+    list_devices, open_device_by_id, open_single_device, DeviceId, DiscoveredDevice,
+    ParseDeviceIdError,
+};
 #[cfg(feature = "wsq")]
 pub use error::WsqError;
 pub use error::{ScannerError, UsbOperation};
