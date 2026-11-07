@@ -8,6 +8,10 @@ readme = "README.md"
 keywords = ["biometrics", "fingerprint", "usb", "futronic", "driver", "wsq"]
 categories = ["hardware-support"]
 
+[lib]
+name = "futronic_fs80h"
+crate-type = ["rlib", "cdylib"]
+
 [features]
 default = ["wsq", "templates", "ansi-378", "matcher", "matcher-base64", "biometric-core", "mcc"]
 wsq = ["dep:cc"]
@@ -27,6 +31,8 @@ lfd-research = []
 # Opt-in, dataset-specific biometric-signal decision built from LFD research
 # metrics. It is disabled by default and is not equivalent to vendor TLFD.
 lfd-experimental-decision = ["lfd-research"]
+# Builds the stable C ABI used by the native distribution packages.
+native = ["lfd-experimental-decision"]
 
 [dependencies]
 rusb = "0.9"

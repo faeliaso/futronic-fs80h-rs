@@ -20,6 +20,8 @@ mod device;
 pub mod discovery;
 pub mod error;
 pub mod frame;
+#[cfg(feature = "native")]
+mod ffi;
 #[cfg(feature = "lfd-research")]
 pub mod lfd;
 #[cfg(feature = "matcher")]
