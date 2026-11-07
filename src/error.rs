@@ -67,6 +67,15 @@ pub enum ScannerError {
     #[error("timed out while waiting for the scanner")]
     Timeout,
 
+    #[error("timed out waiting for finger to be placed on the scanner")]
+    FingerWaitTimeout,
+
+    #[error("timed out waiting for finger to be removed from the scanner")]
+    FingerRemovalTimeout,
+
+    #[error("scanner capture operation was cancelled")]
+    Cancelled,
+
     #[error("incomplete fingerprint frame: received {received} of {expected} bytes")]
     IncompleteFrame { received: usize, expected: usize },
 
@@ -89,7 +98,9 @@ pub enum ScannerError {
     },
 
     #[cfg(feature = "lfd-research")]
-    #[error("FS80H colored-CMOS command {register:#04X} {value:#04X} failed: {message}{restore_status}")]
+    #[error(
+        "FS80H colored-CMOS command {register:#04X} {value:#04X} failed: {message}{restore_status}"
+    )]
     LfdColoredCmosCommand {
         register: u8,
         value: u8,

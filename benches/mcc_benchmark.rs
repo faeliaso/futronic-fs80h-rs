@@ -62,7 +62,12 @@ fn bench_template_match_1_to_1(c: &mut Criterion) {
     group.throughput(Throughput::Elements(1));
 
     group.bench_function("match_templates_40_minutiae", |b| {
-        b.iter(|| black_box(MccMatcher::match_templates(black_box(&template_a), black_box(&template_b))))
+        b.iter(|| {
+            black_box(MccMatcher::match_templates(
+                black_box(&template_a),
+                black_box(&template_b),
+            ))
+        })
     });
 
     group.finish();
@@ -88,9 +93,7 @@ fn bench_gallery_search_1_to_n(c: &mut Criterion) {
     group.bench_with_input(
         BenchmarkId::new("rayon_1_to_n_search", gallery_size),
         &gallery_size,
-        |b, _| {
-            b.iter(|| black_box(gallery.search(black_box(&probe_template), black_box(0.60))))
-        },
+        |b, _| b.iter(|| black_box(gallery.search(black_box(&probe_template), black_box(0.60)))),
     );
 
     group.finish();

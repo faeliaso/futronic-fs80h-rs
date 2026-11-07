@@ -69,6 +69,45 @@ impl RawFrame {
         &self.data
     }
 
+    /// Evaluates finger presence metrics using the default contact ratio threshold (~8%).
+    #[must_use]
+    pub fn presence_metrics(&self) -> crate::presence::FingerPresenceMetrics {
+        self.presence_metrics_with_threshold(crate::presence::DEFAULT_MIN_CONTACT_RATIO)
+    }
+
+    /// Evaluates finger presence metrics using a custom contact ratio threshold.
+    #[must_use]
+    pub fn presence_metrics_with_threshold(
+        &self,
+        min_contact_ratio: f32,
+    ) -> crate::presence::FingerPresenceMetrics {
+        crate::presence::evaluate_frame_presence(
+            self.as_bytes(),
+            self.width() as usize,
+            self.height() as usize,
+            min_contact_ratio,
+        )
+    }
+
+    /// Returns `true` if a finger is detected on the platen using the default contact ratio threshold (~8%).
+    #[must_use]
+    pub fn is_finger_present(&self) -> bool {
+        self.presence_metrics().is_present
+    }
+
+    /// Returns `true` if a finger is detected on the platen using a custom contact ratio threshold.
+    #[must_use]
+    pub fn is_finger_present_with_ratio(&self, min_contact_ratio: f32) -> bool {
+        self.presence_metrics_with_threshold(min_contact_ratio)
+            .is_present
+    }
+
+    /// Returns the fraction of sensor area occupied by active papillary ridges in `[0.0, 1.0]`.
+    #[must_use]
+    pub fn contact_ratio(&self) -> f32 {
+        self.presence_metrics().contact_ratio
+    }
+
     /// Computes the NIST NFIQ2 image-quality score for this frame.
     ///
     /// This requires the optional `nfiq2` feature. The frame is assessed entirely in memory;

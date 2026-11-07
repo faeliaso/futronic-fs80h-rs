@@ -26,7 +26,8 @@ pub const DEFAULT_CELL_SIZE: f32 = (2.0 * DEFAULT_RADIUS) / (MCC_NS as f32);
 pub const DEFAULT_SLICE_WIDTH: f32 = (2.0 * PI) / (MCC_ND as f32);
 
 /// Spatial Gaussian standard deviation $\sigma_S = \frac{2R}{N_S \sqrt{2}} \approx 6.63$ pixels.
-pub const DEFAULT_SIGMA_S: f32 = (2.0 * DEFAULT_RADIUS) / (MCC_NS as f32 * std::f32::consts::SQRT_2);
+pub const DEFAULT_SIGMA_S: f32 =
+    (2.0 * DEFAULT_RADIUS) / (MCC_NS as f32 * std::f32::consts::SQRT_2);
 
 /// Directional Gaussian standard deviation $\sigma_D = \frac{\pi}{6}$ radians ($30^\circ$).
 pub const DEFAULT_SIGMA_D: f32 = PI / 6.0;

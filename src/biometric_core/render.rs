@@ -6,7 +6,7 @@ use image::{Rgb, RgbImage};
 use imageproc::drawing::{draw_hollow_circle_mut, draw_line_segment_mut};
 
 const COLOR_BIFURCATION: Rgb<u8> = Rgb([180, 50, 240]); // Violet / Magenta
-const COLOR_ENDING: Rgb<u8> = Rgb([40, 200, 60]);        // Emerald Green
+const COLOR_ENDING: Rgb<u8> = Rgb([40, 200, 60]); // Emerald Green
 const CIRCLE_RADIUS: i32 = 5;
 const VECTOR_START_RADIUS: f32 = 5.0;
 const VECTOR_LENGTH: f32 = 14.0;

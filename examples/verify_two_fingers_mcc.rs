@@ -12,9 +12,14 @@ use std::time::Instant;
 fn capture_single_finger(
     dev: &mut FutronicDevice,
     finger_label: &str,
-) -> Result<(RawFrame, Vec<biometric_core::BiometricMinutia>, MccTemplate), Box<dyn std::error::Error>>
-{
-    print!("\n👉 Pouse o {} e pressione [Enter] para capturar...", finger_label);
+) -> Result<
+    (RawFrame, Vec<biometric_core::BiometricMinutia>, MccTemplate),
+    Box<dyn std::error::Error>,
+> {
+    print!(
+        "\n👉 Pouse o {} e pressione [Enter] para capturar...",
+        finger_label
+    );
     stdout().flush()?;
     let mut buffer = String::new();
     stdin().read_line(&mut buffer)?;
@@ -54,7 +59,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut dev = match FutronicDevice::open_first() {
         Ok(d) => {
-            println!("\n✅ Leitor óptico detectado: {:?}", d.info().product_name.as_deref().unwrap_or("FS80H"));
+            println!(
+                "\n✅ Leitor óptico detectado: {:?}",
+                d.info().product_name.as_deref().unwrap_or("FS80H")
+            );
             d
         }
         Err(e) => {
@@ -97,7 +105,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\n2. Bit-based Minutia Cylinder-Code (MCC):");
     println!("   • Score normalizado [0..1]: {:.4}", mcc_res.score);
-    println!("   • Pares casados           : {} de K={}", mcc_res.matched_pairs, mcc_res.k);
+    println!(
+        "   • Pares casados           : {} de K={}",
+        mcc_res.matched_pairs, mcc_res.k
+    );
     println!("   • Limiar de match calibrado: >= 0.2700 (Consistência Geométrica NIST 16px)");
     println!("   • Tempo de execução       : {:?}", mcc_time);
 
@@ -108,8 +119,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mcc_is_match = mcc_res.score >= 0.27;
     let b3_is_match = b3_score >= 40;
 
-    println!("• Avaliação NIST BOZORTH3 : {}", if b3_is_match { "✅ MATCH (>= 40)" } else { "❌ REPROVADO (< 40)" });
-    println!("• Avaliação Bit-based MCC : {}", if mcc_is_match { "✅ MATCH (>= 0.2700)" } else { "❌ REPROVADO (< 0.2700)" });
+    println!(
+        "• Avaliação NIST BOZORTH3 : {}",
+        if b3_is_match {
+            "✅ MATCH (>= 40)"
+        } else {
+            "❌ REPROVADO (< 40)"
+        }
+    );
+    println!(
+        "• Avaliação Bit-based MCC : {}",
+        if mcc_is_match {
+            "✅ MATCH (>= 0.2700)"
+        } else {
+            "❌ REPROVADO (< 0.2700)"
+        }
+    );
     println!();
 
     if mcc_is_match && b3_is_match {

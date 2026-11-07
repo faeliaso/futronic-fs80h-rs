@@ -64,7 +64,9 @@ fn read_firmware_config() -> Result<(), Box<dyn std::error::Error>> {
     let mut scanner = FutronicDevice::open_first()?;
     let descriptor = scanner.read_descriptor_bytes()?;
     let rev_byte = descriptor[0x17];
-    println!("Read 64-byte descriptor. Device revision (descriptor[0x17]): {rev_byte:#04X} ({rev_byte})");
+    println!(
+        "Read 64-byte descriptor. Device revision (descriptor[0x17]): {rev_byte:#04X} ({rev_byte})"
+    );
 
     let config = scanner.read_lfd_firmware_color_config()?;
     let bytes = config.bytes();

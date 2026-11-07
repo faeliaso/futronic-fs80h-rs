@@ -60,7 +60,8 @@ impl MccMatcher {
         }
 
         // Directional tolerance in degrees
-        let max_dir_diff_deg = (self.config.max_directional_diff.to_degrees().round() as i32).max(1);
+        let max_dir_diff_deg =
+            (self.config.max_directional_diff.to_degrees().round() as i32).max(1);
 
         // Step 1: Compute candidate pairs (i, j, similarity)
         // Pre-filtered by central minutiae angular difference |θ_i - θ_j| <= π/3
@@ -69,7 +70,11 @@ impl MccMatcher {
         for (i, p) in probe.cylinders.iter().enumerate() {
             for (j, g) in gallery.cylinders.iter().enumerate() {
                 let diff_deg = (p.min_theta as i32 - g.min_theta as i32).rem_euclid(360);
-                let shortest_deg = if diff_deg > 180 { 360 - diff_deg } else { diff_deg };
+                let shortest_deg = if diff_deg > 180 {
+                    360 - diff_deg
+                } else {
+                    diff_deg
+                };
 
                 if shortest_deg <= max_dir_diff_deg {
                     let sim = p.local_similarity(g);
@@ -81,7 +86,8 @@ impl MccMatcher {
         }
 
         // Step 2: Sort descending by similarity score
-        candidates.sort_unstable_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        candidates
+            .sort_unstable_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
 
         if candidates.is_empty() {
             return MccMatchResult {
@@ -106,7 +112,11 @@ impl MccMatcher {
             let g_seed = &gallery.cylinders[seed_j];
 
             let seed_rot_diff = (g_seed.min_theta as i32 - p_seed.min_theta as i32).rem_euclid(360);
-            let seed_rot_shortest = if seed_rot_diff > 180 { seed_rot_diff - 360 } else { seed_rot_diff };
+            let seed_rot_shortest = if seed_rot_diff > 180 {
+                seed_rot_diff - 360
+            } else {
+                seed_rot_diff
+            };
 
             let mut used_probe = vec![false; m];
             let mut used_gallery = vec![false; n];
@@ -126,7 +136,11 @@ impl MccMatcher {
 
                 // 1. Angular consistency relative to seed
                 let rot_diff = (g.min_theta as i32 - p.min_theta as i32).rem_euclid(360);
-                let rot_shortest = if rot_diff > 180 { rot_diff - 360 } else { rot_diff };
+                let rot_shortest = if rot_diff > 180 {
+                    rot_diff - 360
+                } else {
+                    rot_diff
+                };
                 if (rot_shortest - seed_rot_shortest).abs() > max_rot_diff_deg {
                     continue;
                 }

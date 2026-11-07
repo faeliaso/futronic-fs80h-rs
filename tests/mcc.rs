@@ -172,18 +172,27 @@ fn test_end_to_end_extraction_and_mcc_on_real_frame() {
 
     let frame = RawFrame::new(raw_bytes).expect("valid raw frame");
     let minutiae = extract_minutiae(&frame).expect("minutiae extraction");
-    assert!(minutiae.len() >= 15, "Expected at least 15 minutiae from real sample frame");
+    assert!(
+        minutiae.len() >= 15,
+        "Expected at least 15 minutiae from real sample frame"
+    );
 
     let template = MccTemplate::from_minutiae(&minutiae, frame.width(), frame.height());
     assert!(!template.is_empty(), "Expected non-empty MCC template");
 
     // Self match
     let self_score = MccMatcher::match_templates(&template, &template);
-    assert!(self_score >= 0.95, "Real frame self-match score must be ~ 1.0, got {self_score}");
+    assert!(
+        self_score >= 0.95,
+        "Real frame self-match score must be ~ 1.0, got {self_score}"
+    );
 
     // Cross verification with Bozorth3
     let bozorth_score = bozorth3::match_score(&minutiae, &minutiae);
-    assert!(bozorth_score >= 40, "Bozorth3 should confirm self match on real frame (score {bozorth_score})");
+    assert!(
+        bozorth_score >= 40,
+        "Bozorth3 should confirm self match on real frame (score {bozorth_score})"
+    );
 }
 
 #[test]
@@ -208,5 +217,8 @@ fn test_gallery_index_1_to_n_rayon_search() {
     assert!(best.is_some(), "Best candidate must be found");
     let (best_id, best_score) = best.unwrap();
     assert_eq!(best_id, 27, "Must correctly identify candidate ID #27");
-    assert!(best_score >= 0.95, "Match score for exact candidate must be >= 0.95, got {best_score}");
+    assert!(
+        best_score >= 0.95,
+        "Match score for exact candidate must be >= 0.95, got {best_score}"
+    );
 }

@@ -37,11 +37,17 @@ GROUP="plugdev"`, then reload udev rules and reconnect the scanner.
 
 ```no_run
 use futronic_fs80h_rs::FutronicDevice;
+use std::time::Duration;
 
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 let mut scanner = FutronicDevice::open_first()?;
-let frame = scanner.capture_frame()?;
-assert_eq!(frame.as_bytes().len(), 320 * 480);
+
+// Automated capture with finger presence detection, contact stabilization, and 10s timeout:
+let frame = scanner.wait_for_finger_and_capture(Duration::from_secs(10))?;
+println!("Finger captured! Contact ratio: {:.1}%", frame.contact_ratio() * 100.0);
+
+// Wait until the user lifts their finger before allowing subsequent actions:
+scanner.wait_for_finger_removed(Duration::from_secs(5), 0.08, Duration::from_millis(50), |_| true)?;
 # Ok(())
 # }
 ```
@@ -66,7 +72,21 @@ assert_eq!(reconstructed.as_bytes().len(), 320 * 480);
 
 ## Hardware validation
 
-With a connected scanner and suitable USB permission, run:
+With a connected scanner and suitable USB permission, run the interactive auto-capture loop:
+
+```sh
+cargo run --example auto_capture_interactive
+```
+
+This waits for a finger to touch the prism, automatically captures the calibrated frame once contact stabilizes, and waits for finger removal.
+
+To capture, convert directly to Base64 (both PNG and FBI WSQ), and save as `.txt` and `.png`:
+
+```sh
+cargo run --example capture_to_base64
+```
+
+To capture immediately without finger presence polling:
 
 ```sh
 cargo run --example capture_to_png

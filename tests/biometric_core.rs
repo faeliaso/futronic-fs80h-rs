@@ -1,9 +1,7 @@
 use fprint_bozorth3::{match_score, MIN_COMPUTABLE_BOZORTH_MINUTIAE};
 use futronic_fs80h_rs::{
     biometric_core::{
-        self,
-        crossing_number::extract_minutiae_from_skeleton,
-        thinning::zhang_suen_thinning,
+        self, crossing_number::extract_minutiae_from_skeleton, thinning::zhang_suen_thinning,
         BiometricMinutia, MinutiaType,
     },
     RawFrame, RAW_FRAME_SIZE, SENSOR_HEIGHT, SENSOR_WIDTH,
@@ -57,7 +55,10 @@ fn zhang_suen_thinning_reduces_thick_line_to_single_pixel() {
     for y in 0..height {
         let count = (0..width).filter(|&x| skeleton[y * width + x]).count();
         // Each row must either have 0 or exactly 1 skeleton pixel (never > 1)
-        assert!(count <= 1, "row {y} has {count} skeleton pixels, expected <= 1");
+        assert!(
+            count <= 1,
+            "row {y} has {count} skeleton pixels, expected <= 1"
+        );
         if count == 1 {
             skeleton_pixels += 1;
         }
@@ -97,7 +98,9 @@ fn end_to_end_extraction_and_bozorth3_match_on_real_frame() {
             img.to_luma8().into_raw()
         }
         Err(_) => {
-            eprintln!("Sample fingerprint image not found at '{img_path}', skipping live frame test.");
+            eprintln!(
+                "Sample fingerprint image not found at '{img_path}', skipping live frame test."
+            );
             return;
         }
     };
@@ -109,7 +112,10 @@ fn end_to_end_extraction_and_bozorth3_match_on_real_frame() {
 
     // 1. Extração algorítmica de minúcias
     let minutiae = biometric_core::extract_minutiae(&frame).expect("extraction succeeds");
-    println!("Extracted {} minutiae from calibrated frame", minutiae.len());
+    println!(
+        "Extracted {} minutiae from calibrated frame",
+        minutiae.len()
+    );
 
     assert!(
         minutiae.len() >= MIN_COMPUTABLE_BOZORTH_MINUTIAE,
@@ -119,8 +125,14 @@ fn end_to_end_extraction_and_bozorth3_match_on_real_frame() {
     );
 
     // Verify both types of minutiae are present
-    let endings = minutiae.iter().filter(|m| m.kind == MinutiaType::Ending).count();
-    let bifurcations = minutiae.iter().filter(|m| m.kind == MinutiaType::Bifurcation).count();
+    let endings = minutiae
+        .iter()
+        .filter(|m| m.kind == MinutiaType::Ending)
+        .count();
+    let bifurcations = minutiae
+        .iter()
+        .filter(|m| m.kind == MinutiaType::Bifurcation)
+        .count();
     println!("Endings: {endings}, Bifurcations: {bifurcations}");
     assert!(endings > 0, "Must have endings");
     assert!(bifurcations > 0, "Must have bifurcations");

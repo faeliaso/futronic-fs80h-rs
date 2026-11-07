@@ -264,12 +264,12 @@ fn compute_bifurcation_orientation(
     // If 3 branches are identified, identify the fork (pair with smallest angular separation)
     // and select the remaining branch as the trunk.
     let (dx, dy) = if branch_vectors.len() == 3 {
-        let dot01 = branch_vectors[0].0 * branch_vectors[1].0
-            + branch_vectors[0].1 * branch_vectors[1].1;
-        let dot12 = branch_vectors[1].0 * branch_vectors[2].0
-            + branch_vectors[1].1 * branch_vectors[2].1;
-        let dot02 = branch_vectors[0].0 * branch_vectors[2].0
-            + branch_vectors[0].1 * branch_vectors[2].1;
+        let dot01 =
+            branch_vectors[0].0 * branch_vectors[1].0 + branch_vectors[0].1 * branch_vectors[1].1;
+        let dot12 =
+            branch_vectors[1].0 * branch_vectors[2].0 + branch_vectors[1].1 * branch_vectors[2].1;
+        let dot02 =
+            branch_vectors[0].0 * branch_vectors[2].0 + branch_vectors[0].1 * branch_vectors[2].1;
 
         // Max dot product corresponds to the smallest angle (the fork branches)
         if dot01 >= dot12 && dot01 >= dot02 {
@@ -326,13 +326,7 @@ fn filter_close_pairs(minutiae: Vec<BiometricMinutia>, min_dist: f32) -> Vec<Bio
 }
 
 /// Calculates minutia quality based on boundary margin and skeleton stability.
-fn calculate_quality(
-    x: usize,
-    y: usize,
-    width: usize,
-    height: usize,
-    trace_len: usize,
-) -> f32 {
+fn calculate_quality(x: usize, y: usize, width: usize, height: usize, trace_len: usize) -> f32 {
     let dist_x = (x as f32).min((width - 1 - x) as f32);
     let dist_y = (y as f32).min((height - 1 - y) as f32);
     let border_dist = dist_x.min(dist_y);

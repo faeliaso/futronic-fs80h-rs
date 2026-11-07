@@ -24,7 +24,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         frame.height(),
         image::ColorType::L8,
     )?;
-    println!("1. Imagem original (fundo preto) gravada em '{}'", orig_black_path);
+    println!(
+        "1. Imagem original (fundo preto) gravada em '{}'",
+        orig_black_path
+    );
 
     let inverted = frame.inverted();
     let orig_white_path = "capture_original_white.png";
@@ -35,7 +38,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         inverted.height(),
         image::ColorType::L8,
     )?;
-    println!("2. Imagem original (fundo branco) gravada em '{}'", orig_white_path);
+    println!(
+        "2. Imagem original (fundo branco) gravada em '{}'",
+        orig_white_path
+    );
 
     // 3. Extração algorítmica de minúcias
     let start_ext = Instant::now();
@@ -50,12 +56,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let annot_black_path = "capture_annotated_black.png";
     let annot_black_img = biometric_core::render_minutiae_overlay(&frame, &minutiae);
     annot_black_img.save(annot_black_path)?;
-    println!("3. Imagem anotada (fundo preto) gravada em '{}'", annot_black_path);
+    println!(
+        "3. Imagem anotada (fundo preto) gravada em '{}'",
+        annot_black_path
+    );
 
     let annot_white_path = "capture_annotated_white.png";
     let annot_white_img = biometric_core::render_minutiae_overlay_inverted(&frame, &minutiae);
     annot_white_img.save(annot_white_path)?;
-    println!("4. Imagem anotada (fundo branco) gravada em '{}'", annot_white_path);
+    println!(
+        "4. Imagem anotada (fundo branco) gravada em '{}'",
+        annot_white_path
+    );
 
     // 5. Verificação de matching 1:1 via fprint-bozorth3
     let bozorth_points: Vec<fprint_bozorth3::Minutia> = minutiae.iter().map(Into::into).collect();

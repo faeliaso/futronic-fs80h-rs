@@ -167,7 +167,10 @@ mod tests {
         }
 
         let sim = c.local_similarity(&c);
-        assert!((sim - 1.0).abs() < f32::EPSILON, "Self-similarity must be exactly 1.0, got: {sim}");
+        assert!(
+            (sim - 1.0).abs() < f32::EPSILON,
+            "Self-similarity must be exactly 1.0, got: {sim}"
+        );
     }
 
     #[test]
@@ -182,7 +185,10 @@ mod tests {
         c2.bits = [0u64; MCC_WORDS];
 
         let sim = c1.local_similarity(&c2);
-        assert!((sim - 0.0).abs() < f32::EPSILON, "Opposite bits must give 0.0 similarity, got: {sim}");
+        assert!(
+            (sim - 0.0).abs() < f32::EPSILON,
+            "Opposite bits must give 0.0 similarity, got: {sim}"
+        );
     }
 
     #[test]

@@ -28,6 +28,82 @@ pub struct DeviceInfo {
     pub product_name: Option<String>,
 }
 
+/// Configuration settings governing automated finger presence detection and capture.
+#[derive(Debug, Clone)]
+pub struct AutoCaptureOptions {
+    /// Maximum time duration to wait for finger contact before returning `ScannerError::FingerWaitTimeout`.
+    /// Default: 10 seconds.
+    pub timeout: std::time::Duration,
+    /// Minimum contact ratio in `[0.0, 1.0]` required to consider a finger present.
+    /// Default: 0.08 (~8% of active sensor area).
+    pub min_contact_ratio: f32,
+    /// Exposure dose used for polling frames. Default: `DEFAULT_IMAGE_DOSE` (166).
+    pub poll_dose: u8,
+    /// Exposure dose used for the final accepted capture frame. Default: `DEFAULT_IMAGE_DOSE` (166).
+    pub capture_dose: u8,
+    /// Polling sleep interval between capture attempts. Default: 40ms.
+    pub poll_interval: std::time::Duration,
+    /// Number of consecutive stable frames required before accepting the capture. Default: 2.
+    pub consecutive_stable_frames: usize,
+    /// Maximum allowable difference in contact ratio between consecutive frames to be considered stable.
+    /// Default: 0.06.
+    pub stability_tolerance: f32,
+    /// Controls whether the green status diode is automatically turned on during the wait cycle
+    /// and restored afterwards. Default: true.
+    pub visual_feedback: bool,
+    /// Controls whether the capture loop should block and wait until the finger is removed
+    /// before returning. Default: false.
+    pub wait_for_removal: bool,
+    /// Timeout duration when waiting for finger removal if `wait_for_removal` is enabled.
+    /// Default: 5 seconds.
+    pub removal_timeout: std::time::Duration,
+}
+
+impl Default for AutoCaptureOptions {
+    fn default() -> Self {
+        Self {
+            timeout: std::time::Duration::from_secs(10),
+            min_contact_ratio: crate::presence::DEFAULT_MIN_CONTACT_RATIO,
+            poll_dose: DEFAULT_IMAGE_DOSE,
+            capture_dose: DEFAULT_IMAGE_DOSE,
+            poll_interval: std::time::Duration::from_millis(40),
+            consecutive_stable_frames: 2,
+            stability_tolerance: 0.06,
+            visual_feedback: true,
+            wait_for_removal: false,
+            removal_timeout: std::time::Duration::from_secs(5),
+        }
+    }
+}
+
+/// Progress events emitted during automated finger detection and capture.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CaptureFeedback {
+    /// Actively polling; waiting for a finger to be placed on the platen.
+    WaitingForFinger {
+        /// Time elapsed since the auto-capture cycle began.
+        elapsed: std::time::Duration,
+    },
+    /// Finger contact detected on the platen; awaiting contact stabilization.
+    FingerDetected {
+        /// Measured finger contact ratio in `[0.0, 1.0]`.
+        contact_ratio: f32,
+        /// Current count of consecutive stable frames observed.
+        stable_count: usize,
+        /// Target count of stable frames required for capture.
+        required_stable: usize,
+    },
+    /// Finger contact is stable; initiating final calibrated capture.
+    CapturingFinal,
+    /// Actively waiting for the finger to be removed from the platen (only emitted if `wait_for_removal` is true).
+    WaitingForRemoval {
+        /// Time elapsed since waiting for finger removal began.
+        elapsed: std::time::Duration,
+    },
+    /// Auto-capture cycle successfully completed.
+    Completed,
+}
+
 /// An exclusively claimed Futronic USB scanner.
 pub struct FutronicDevice {
     handle: DeviceHandle<GlobalContext>,
@@ -202,6 +278,181 @@ impl FutronicDevice {
     pub fn capture_frame_with_frame_mode(&mut self, dose: u8) -> Result<RawFrame, ScannerError> {
         let stream = self.capture_raw_sensor_stream_with_frame_mode(dose)?;
         RawFrame::from_raw_sensor_stream(&stream)
+    }
+
+    /// Waits actively for a finger to be placed and stabilized on the sensor platen,
+    /// returning a validated, calibrated [`RawFrame`].
+    ///
+    /// The `feedback` closure receives [`CaptureFeedback`] updates during the polling loop.
+    /// If the closure returns `false`, polling terminates immediately with [`ScannerError::Cancelled`].
+    pub fn wait_for_finger_present<F>(
+        &mut self,
+        options: &AutoCaptureOptions,
+        mut feedback: F,
+    ) -> Result<RawFrame, ScannerError>
+    where
+        F: FnMut(CaptureFeedback) -> bool,
+    {
+        if options.visual_feedback {
+            let _ = self.set_diodes(true, false);
+        }
+
+        let result = self.run_wait_for_finger_loop(options, &mut feedback);
+
+        if options.visual_feedback {
+            let _ = self.set_diodes(false, false);
+        }
+
+        result
+    }
+
+    fn run_wait_for_finger_loop<F>(
+        &mut self,
+        options: &AutoCaptureOptions,
+        feedback: &mut F,
+    ) -> Result<RawFrame, ScannerError>
+    where
+        F: FnMut(CaptureFeedback) -> bool,
+    {
+        let start_time = std::time::Instant::now();
+        let mut stable_count = 0_usize;
+        let mut last_contact_ratio = 0.0_f32;
+
+        loop {
+            let elapsed = start_time.elapsed();
+            if elapsed >= options.timeout {
+                return Err(ScannerError::FingerWaitTimeout);
+            }
+
+            if stable_count == 0 && !feedback(CaptureFeedback::WaitingForFinger { elapsed }) {
+                return Err(ScannerError::Cancelled);
+            }
+
+            let frame = if options.poll_dose == DEFAULT_IMAGE_DOSE {
+                self.capture_frame_with_frame_mode(options.poll_dose)?
+            } else {
+                self.capture_frame_with_dose(options.poll_dose)?
+            };
+
+            let metrics = frame.presence_metrics_with_threshold(options.min_contact_ratio);
+            if metrics.is_present {
+                let delta = (metrics.contact_ratio - last_contact_ratio).abs();
+                if stable_count == 0 || delta <= options.stability_tolerance {
+                    stable_count += 1;
+                } else {
+                    // Contact area shifted significantly, reset to ensure settling
+                    stable_count = 1;
+                }
+                last_contact_ratio = metrics.contact_ratio;
+
+                if !feedback(CaptureFeedback::FingerDetected {
+                    contact_ratio: metrics.contact_ratio,
+                    stable_count,
+                    required_stable: options.consecutive_stable_frames,
+                }) {
+                    return Err(ScannerError::Cancelled);
+                }
+
+                if stable_count >= options.consecutive_stable_frames {
+                    if !feedback(CaptureFeedback::CapturingFinal) {
+                        return Err(ScannerError::Cancelled);
+                    }
+
+                    let final_frame = if options.poll_dose == options.capture_dose {
+                        frame
+                    } else {
+                        self.capture_frame_with_frame_mode(options.capture_dose)?
+                    };
+
+                    if options.wait_for_removal {
+                        let removal_start = std::time::Instant::now();
+                        loop {
+                            let rem_elapsed = removal_start.elapsed();
+                            if rem_elapsed >= options.removal_timeout {
+                                return Err(ScannerError::FingerRemovalTimeout);
+                            }
+                            if !feedback(CaptureFeedback::WaitingForRemoval {
+                                elapsed: rem_elapsed,
+                            }) {
+                                return Err(ScannerError::Cancelled);
+                            }
+                            let check = self
+                                .capture_frame_with_dose(crate::protocol::PREVIEW_MEASURE_DOSE)?;
+                            let rem_metrics =
+                                check.presence_metrics_with_threshold(options.min_contact_ratio);
+                            if !rem_metrics.is_present {
+                                break;
+                            }
+                            if !options.poll_interval.is_zero() {
+                                std::thread::sleep(options.poll_interval);
+                            }
+                        }
+                    }
+
+                    let _ = feedback(CaptureFeedback::Completed);
+                    return Ok(final_frame);
+                }
+            } else {
+                stable_count = 0;
+                last_contact_ratio = 0.0;
+            }
+
+            if !options.poll_interval.is_zero() {
+                std::thread::sleep(options.poll_interval);
+            }
+        }
+    }
+
+    /// Convenience wrapper awaiting finger placement and capture using default settings and timeout.
+    pub fn wait_for_finger_and_capture(
+        &mut self,
+        timeout: std::time::Duration,
+    ) -> Result<RawFrame, ScannerError> {
+        let options = AutoCaptureOptions {
+            timeout,
+            ..Default::default()
+        };
+        self.wait_for_finger_present(&options, |_| true)
+    }
+
+    /// Waits until the user lifts their finger from the scanner platen.
+    ///
+    /// This is essential in kiosk and multi-step enrollment workflows to prevent
+    /// consecutive operations from inadvertently capturing the same placement twice.
+    ///
+    /// Returns `Ok(())` once contact drops below the specified ratio, or
+    /// `Err(ScannerError::FingerRemovalTimeout)` if the finger is not lifted within `timeout`.
+    pub fn wait_for_finger_removed<F>(
+        &mut self,
+        timeout: std::time::Duration,
+        min_contact_ratio: f32,
+        poll_interval: std::time::Duration,
+        mut feedback: F,
+    ) -> Result<(), ScannerError>
+    where
+        F: FnMut(std::time::Duration) -> bool,
+    {
+        let start_time = std::time::Instant::now();
+        loop {
+            let elapsed = start_time.elapsed();
+            if elapsed >= timeout {
+                return Err(ScannerError::FingerRemovalTimeout);
+            }
+
+            if !feedback(elapsed) {
+                return Err(ScannerError::Cancelled);
+            }
+
+            let frame = self.capture_frame_with_dose(crate::protocol::PREVIEW_MEASURE_DOSE)?;
+            let metrics = frame.presence_metrics_with_threshold(min_contact_ratio);
+            if !metrics.is_present {
+                return Ok(());
+            }
+
+            if !poll_interval.is_zero() {
+                std::thread::sleep(poll_interval);
+            }
+        }
     }
 
     /// Captures a raw CMOS sensor stream using the recovered `GetFrame` setup.
@@ -501,16 +752,16 @@ impl FutronicDevice {
             }
             self.capture_lfd_auxiliary_triplet(0)
                 .map_err(|error| (None, error))
-        })();
+        })(
+        );
 
         self.flush_bulk_in();
         std::thread::sleep(std::time::Duration::from_millis(35));
 
-        let restore_result = self
-            .write_command(
-                &lfd::BL2_CMOS_RESTORE_COMMAND,
-                UsbOperation::RestoreLfdColoredCmos,
-            );
+        let restore_result = self.write_command(
+            &lfd::BL2_CMOS_RESTORE_COMMAND,
+            UsbOperation::RestoreLfdColoredCmos,
+        );
         self.flush_bulk_in();
 
         match setup_result {

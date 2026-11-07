@@ -78,8 +78,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut p = *m;
                 if id != 42 {
                     // Outros registros com offsets aleatórios
-                    p.x = ((p.x as f32 + (i as f32 * 3.1 + id as f32).sin() * 25.0).max(10.0) as u32).min(310);
-                    p.y = ((p.y as f32 + (i as f32 * 2.7 + id as f32).cos() * 25.0).max(10.0) as u32).min(470);
+                    p.x = ((p.x as f32 + (i as f32 * 3.1 + id as f32).sin() * 25.0).max(10.0)
+                        as u32)
+                        .min(310);
+                    p.y = ((p.y as f32 + (i as f32 * 2.7 + id as f32).cos() * 25.0).max(10.0)
+                        as u32)
+                        .min(470);
                 }
                 p
             })
@@ -99,7 +103,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             search_time,
             search_time / gallery_size as u32
         );
-        assert_eq!(best_id, 42, "O candidato id 42 deveria ser o match perfeito!");
+        assert_eq!(
+            best_id, 42,
+            "O candidato id 42 deveria ser o match perfeito!"
+        );
     }
 
     println!("\nPipeline executado com sucesso!");
