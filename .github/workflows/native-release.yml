@@ -54,7 +54,9 @@ jobs:
             target/${{ matrix.target }}/release/*.dll
             target/${{ matrix.target }}/release/*.lib
             include/futronic_fs80h.h
-            docs/integracao-nativa.md
+            README.md
+            README_EN.md
+            EXAMPLES.md
             LICENSE
 
   release:

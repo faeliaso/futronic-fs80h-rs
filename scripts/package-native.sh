@@ -25,6 +25,6 @@ else
   exit 1
 fi
 cp include/futronic_fs80h.h "$out/include/"
-cp docs/integracao-nativa.md docs/native-integration.md LICENSE c_src/LICENSE-NIST "$out/docs/"
+cp README.md README_EN.md EXAMPLES.md LICENSE c_src/LICENSE-NIST "$out/docs/"
 (cd dist && tar -czf "$(basename "$out").tar.gz" "$(basename "$out")")
 shasum -a 256 "dist/$(basename "$out").tar.gz" > "dist/$(basename "$out").tar.gz.sha256"
