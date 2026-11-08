@@ -1,5 +1,8 @@
 # Release pipeline
 
+This guide applies after the `develop` to `main` pull request has passed CI and
+been merged. Releases are always tagged from `main`.
+
 The GitHub Actions pipeline has two non-publishing gates:
 
 - **CI** runs on every push and pull request. It checks formatting, Clippy,
