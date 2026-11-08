@@ -7,8 +7,7 @@ frame, hashes de imagens ou qualquer dado biométrico no relatório ou nos logs.
 
 ```sh
 make validate
-cd ../fs80hctl
-cargo run -p fs80h-cli -- --json devices
+cargo run --example list_devices
 ```
 
 O segundo comando deve listar o dispositivo com o VID `1491` e PID `0020`
@@ -18,21 +17,21 @@ host que recebeu o dispositivo.
 
 ## Roteiro por modelo
 
-1. Registre SO, versão do crate, modelo, bus e address fornecidos pelo comando
-   de descoberta.
-2. Abra o dispositivo sem capturar: `cargo run -p fs80h-cli -- device inspect
-   --bus <bus> --address <address>`.
-3. Execute uma captura no modo padrão e outra no modo variável:
+1. Registre SO, versão do crate, modelo e identificador USB fornecidos pelo
+   comando de descoberta.
+2. Com apenas um leitor conectado, execute uma captura no modo padrão e outra
+   no modo variável:
 
    ```sh
-   cargo run -p fs80h-cli -- capture --bus <bus> --address <address> --output /tmp/fs80h-check.png
-   cargo run -p fs80h-cli -- capture --bus <bus> --address <address> --variable-dose --dose 166 --output /tmp/fs80h-variable.png
+   cargo run --example capture_metadata
+   cargo run --example capture_metadata -- --variable-dose
    ```
 
-4. Confirme somente a geometria esperada (320×480, 500 DPI), o modo e o
-   sucesso ou erro. Remova imediatamente os PNGs e seus manifestos se não
-   forem necessários para um procedimento autorizado de retenção.
-5. Registre mensagens de erro sem anexar dados biométricos.
+   Os exemplos não gravam imagens ou bytes de frame: eles mostram apenas
+   metadados de descoberta e de geometria.
+3. Confirme somente a geometria esperada (320×480, 500 DPI), o modo e o
+   sucesso ou erro.
+4. Registre mensagens de erro sem anexar dados biométricos.
 
 ## Registro mínimo
 

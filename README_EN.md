@@ -23,4 +23,5 @@ logs.
 
 ```sh
 make validate
+cargo run --example list_devices
 ```
