@@ -27,15 +27,6 @@ impl RawFrame {
             RAW_FRAME_SIZE => Ok(Self {
                 data: stream.to_vec(),
             }),
-            FS80_RAW_SENSOR_STREAM_SIZE => Ok(Self {
-                data: resample_bilinear(
-                    stream,
-                    FS80_RAW_SENSOR_WIDTH,
-                    RAW_SENSOR_HEIGHT,
-                    SENSOR_WIDTH,
-                    SENSOR_HEIGHT,
-                ),
-            }),
             RAW_SENSOR_STREAM_SIZE => Ok(Self {
                 data: resample_bilinear(
                     stream,
@@ -45,9 +36,18 @@ impl RawFrame {
                     SENSOR_HEIGHT,
                 ),
             }),
+            FS80_RAW_SENSOR_STREAM_SIZE => Ok(Self {
+                data: resample_bilinear(
+                    stream,
+                    FS80_RAW_SENSOR_WIDTH,
+                    RAW_SENSOR_HEIGHT,
+                    SENSOR_WIDTH,
+                    SENSOR_HEIGHT,
+                ),
+            }),
             received => Err(ScannerError::IncompleteFrame {
                 received,
-                expected: FS80_RAW_SENSOR_STREAM_SIZE,
+                expected: RAW_SENSOR_STREAM_SIZE,
             }),
         }
     }
@@ -164,7 +164,7 @@ mod tests {
             error,
             ScannerError::IncompleteFrame {
                 received: 123,
-                expected: FS80_RAW_SENSOR_STREAM_SIZE,
+                expected: RAW_SENSOR_STREAM_SIZE,
             }
         );
     }
