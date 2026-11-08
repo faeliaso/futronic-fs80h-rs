@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+## 0.1.1 - 2026-11-08
+
+### Fixed
+
+- Restored 384-column physical CMOS sensor line width and 307,200-byte stream reading for FS80H devices, fixing the 64-pixel row offset and diagonal distortion.
+
 ### Added
 
 - Contributor and release-process documentation for the protected GitHub
