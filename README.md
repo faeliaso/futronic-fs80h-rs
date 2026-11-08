@@ -22,7 +22,7 @@ NFIQ2 are preserved in the `archive/ffi-lfd-research` branch.
 Building requires `libusb-1.0` and `pkg-config`. On Linux, grant the
 application USB access to VID `1491`.
 
-The MSRV is Rust 1.70.
+The MSRV is Rust 1.71.
 
 ## Compatibility
 

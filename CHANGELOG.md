@@ -19,4 +19,4 @@ All notable changes to this project are documented in this file.
 
 - Frame-mode restoration now emits a warning when it fails after a failed
   capture, while preserving the capture error returned to the caller.
-- The crate declares Rust 1.70 as its minimum supported Rust version (MSRV).
+- The crate declares Rust 1.71 as its minimum supported Rust version (MSRV).
