@@ -161,20 +161,13 @@ impl FutronicDevice {
         )?;
         std::thread::sleep(std::time::Duration::from_millis(60));
         let stream_result = self.capture_raw_sensor_stream(dose);
-        let restore = self.write_command(
-            &[SET_FRAME_MODE_GAIN, FRAME_MODE_GAIN_RESET],
-            UsbOperation::ConfigureFrameMode,
-        );
-        match stream_result {
-            Ok(stream) => {
-                restore?;
-                RawFrame::from_raw_sensor_stream(&stream)
-            }
-            Err(error) => {
-                let _ = restore;
-                Err(error)
-            }
-        }
+        let stream = restore_frame_mode_after_capture(stream_result, || {
+            self.write_command(
+                &[SET_FRAME_MODE_GAIN, FRAME_MODE_GAIN_RESET],
+                UsbOperation::ConfigureFrameMode,
+            )
+        })?;
+        RawFrame::from_raw_sensor_stream(&stream)
     }
 
     /// Captures the unresampled CMOS stream for diagnostics.
@@ -292,6 +285,31 @@ fn select_capture_interface(
         .ok_or(ScannerError::UnsupportedUsbLayout)
 }
 
+/// Restores the frame-mode register after an attempted capture. A restore
+/// failure is returned only when capture succeeded; otherwise the capture
+/// error is the actionable failure and is preserved for the caller.
+fn restore_frame_mode_after_capture<T>(
+    capture_result: Result<T, ScannerError>,
+    restore: impl FnOnce() -> Result<(), ScannerError>,
+) -> Result<T, ScannerError> {
+    match capture_result {
+        Ok(value) => {
+            restore()?;
+            Ok(value)
+        }
+        Err(capture_error) => {
+            if let Err(restore_error) = restore() {
+                tracing::warn!(
+                    ?capture_error,
+                    ?restore_error,
+                    "failed to restore scanner frame mode after capture failure"
+                );
+            }
+            Err(capture_error)
+        }
+    }
+}
+
 #[cfg(target_os = "linux")]
 fn detach_kernel_driver(
     handle: &mut DeviceHandle<GlobalContext>,
@@ -348,7 +366,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{read_complete_frame, select_capture_interface};
+    use super::{read_complete_frame, restore_frame_mode_after_capture, select_capture_interface};
     use crate::error::ScannerError;
     use crate::protocol::{EXPECTED_BULK_IN_ENDPOINT, EXPECTED_BULK_OUT_ENDPOINT};
     use std::collections::VecDeque;
@@ -465,5 +483,61 @@ mod tests {
             select_capture_interface(vec![]),
             Err(ScannerError::UnsupportedUsbLayout)
         );
+    }
+
+    struct SimulatedTransport {
+        capture_result: Result<Vec<u8>, ScannerError>,
+        restore_result: Result<(), ScannerError>,
+        restore_calls: usize,
+    }
+
+    impl SimulatedTransport {
+        fn restore_frame_mode(&mut self) -> Result<(), ScannerError> {
+            self.restore_calls += 1;
+            self.restore_result.clone()
+        }
+    }
+
+    #[test]
+    fn capture_failure_is_preserved_when_restore_also_fails() {
+        let capture_error = ScannerError::FrameReadTimeout {
+            received: 1024,
+            expected: 307_200,
+        };
+        let mut transport = SimulatedTransport {
+            capture_result: Err(capture_error.clone()),
+            restore_result: Err(ScannerError::Usb {
+                operation: crate::UsbOperation::ConfigureFrameMode,
+                message: "simulated restore failure".to_string(),
+            }),
+            restore_calls: 0,
+        };
+
+        let capture_result = transport.capture_result.clone();
+        let result =
+            restore_frame_mode_after_capture(capture_result, || transport.restore_frame_mode());
+
+        assert_eq!(result, Err(capture_error));
+        assert_eq!(transport.restore_calls, 1);
+    }
+
+    #[test]
+    fn restore_failure_is_returned_after_successful_capture() {
+        let restore_error = ScannerError::Usb {
+            operation: crate::UsbOperation::ConfigureFrameMode,
+            message: "simulated restore failure".to_string(),
+        };
+        let mut transport = SimulatedTransport {
+            capture_result: Ok(vec![1, 2, 3]),
+            restore_result: Err(restore_error.clone()),
+            restore_calls: 0,
+        };
+
+        let capture_result = transport.capture_result.clone();
+        let result =
+            restore_frame_mode_after_capture(capture_result, || transport.restore_frame_mode());
+
+        assert_eq!(result, Err(restore_error));
+        assert_eq!(transport.restore_calls, 1);
     }
 }

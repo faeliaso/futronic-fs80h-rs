@@ -22,9 +22,22 @@ e NFIQ2 foram preservados na branch `archive/ffi-lfd-research`.
 O build exige `libusb-1.0` e `pkg-config`. Em Linux, conceda à aplicação
 permissão de acesso USB ao VID `1491`.
 
+O MSRV é Rust 1.70.
+
+## Compatibilidade
+
+| Modelo | PID | Stream bruto | Frame retornado | Modos |
+| --- | --- | --- | --- | --- |
+| FS80H | `0020` | 320×800 | 320×480, 500 DPI | frame mode e dose variável |
+| FS81H | `0025` | 384×800 | 320×480, 500 DPI | frame mode e dose variável |
+
+O driver usa `libusb` em Linux e macOS. A execução automática cobre a lógica
+sem hardware; a validação física por SO, modelo e modo deve seguir o
+[roteiro de hardware](docs/HARDWARE_VALIDATION.md). Não registre dados
+biométricos nos logs.
+
 ## Verificação
 
 ```sh
-cargo check
-cargo test --lib --tests
+make validate
 ```
