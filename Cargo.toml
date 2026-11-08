@@ -1,6 +1,6 @@
 [package]
 name = "futronic-fs80h-rs"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Pure Rust userspace USB driver for Futronic FS80H and FS81H fingerprint scanners."
 license = "MIT"
@@ -32,8 +32,9 @@ lfd-research = []
 # Opt-in, dataset-specific biometric-signal decision built from LFD research
 # metrics. It is disabled by default and is not equivalent to vendor TLFD.
 lfd-experimental-decision = ["lfd-research"]
-# Builds the stable C ABI used by the native distribution packages.
-native = ["lfd-experimental-decision"]
+# Builds the operational C ABI used by native distribution packages.  Research
+# features deliberately remain opt-in and are never part of this bundle.
+native = ["wsq", "image-formats", "templates", "ansi-378", "matcher", "biometric-core", "mcc"]
 
 [dependencies]
 rusb = "0.9"

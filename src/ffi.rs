@@ -11,7 +11,7 @@ use std::{
     ptr,
 };
 
-pub const ABI_VERSION: u32 = 1;
+pub const ABI_VERSION: u32 = 2;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -72,6 +72,30 @@ pub struct Fs80hPresenceMetrics {
     pub active_blocks: u32,
     pub total_blocks: u32,
     pub is_present: u8,
+}
+
+/// Stable, bounded controls for a non-interactive automatic capture.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Fs80hAutoCaptureOptions {
+    pub timeout_ms: u64,
+    pub min_contact_ratio: f32,
+    pub poll_dose: u8,
+    pub capture_dose: u8,
+    pub poll_interval_ms: u32,
+    pub consecutive_stable_frames: u32,
+    pub stability_tolerance: f32,
+    pub green_led: u8,
+    pub red_led: u8,
+    pub wait_for_removal: u8,
+    pub removal_timeout_ms: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct Fs80hAutoCaptureReport {
+    pub final_contact: Fs80hPresenceMetrics,
+    pub removal_waited: u8,
 }
 
 #[repr(C)]
@@ -188,6 +212,39 @@ fn presence(metrics: FingerPresenceMetrics) -> Fs80hPresenceMetrics {
         total_blocks: metrics.total_blocks as u32,
         is_present: u8::from(metrics.is_present),
     }
+}
+
+fn auto_options(
+    value: &Fs80hAutoCaptureOptions,
+) -> Result<crate::AutoCaptureOptions, (Fs80hStatus, String)> {
+    if !value.min_contact_ratio.is_finite()
+        || !(0.0..=1.0).contains(&value.min_contact_ratio)
+        || !value.stability_tolerance.is_finite()
+        || !(0.0..=1.0).contains(&value.stability_tolerance)
+        || value.consecutive_stable_frames == 0
+        || value.timeout_ms == 0
+        || value.removal_timeout_ms == 0
+        || value.green_led > 1
+        || value.red_led > 1
+        || value.wait_for_removal > 1
+    {
+        return Err((
+            Fs80hStatus::InvalidArgument,
+            "invalid automatic-capture options".into(),
+        ));
+    }
+    Ok(crate::AutoCaptureOptions {
+        timeout: std::time::Duration::from_millis(value.timeout_ms),
+        min_contact_ratio: value.min_contact_ratio,
+        poll_dose: value.poll_dose,
+        capture_dose: value.capture_dose,
+        poll_interval: std::time::Duration::from_millis(value.poll_interval_ms.into()),
+        consecutive_stable_frames: value.consecutive_stable_frames as usize,
+        stability_tolerance: value.stability_tolerance,
+        visual_feedback: value.green_led != 0 || value.red_led != 0,
+        wait_for_removal: value.wait_for_removal != 0,
+        removal_timeout: std::time::Duration::from_millis(value.removal_timeout_ms),
+    })
 }
 
 /// Returns the ABI revision, independent from the crate semver version.
@@ -340,73 +397,28 @@ pub extern "C" fn fs80h_device_capture(
 }
 
 #[no_mangle]
-pub extern "C" fn fs80h_device_capture_raw_sensor_stream(
-    device: *mut Fs80hDevice,
-    dose: u8,
-    out: *mut Fs80hBuffer,
-) -> Fs80hStatus {
-    with_guard(|| unsafe {
-        *required_out(out)? = buffer_from_vec(
-            required_mut(device, "device")?
-                .inner
-                .capture_raw_sensor_stream(dose)
-                .map_err(map_error)?,
-        );
-        Ok(())
-    })
-}
-
-/// Experimental FS80H LFD probe; this is not a liveness decision.
-#[no_mangle]
-pub extern "C" fn fs80h_device_probe_lfd_auxiliary(
-    device: *mut Fs80hDevice,
-    selector: u8,
-    profile: u8,
-    out: *mut Fs80hBuffer,
-) -> Fs80hStatus {
-    with_guard(|| unsafe {
-        *required_out(out)? = buffer_from_vec(
-            required_mut(device, "device")?
-                .inner
-                .probe_lfd_auxiliary_frame(selector, profile, 384, 800)
-                .map_err(map_error)?,
-        );
-        Ok(())
-    })
-}
-
-/// Returns the raw 64-byte FS80H firmware configuration used for LFD research.
-#[no_mangle]
-pub extern "C" fn fs80h_device_lfd_firmware_config(
-    device: *mut Fs80hDevice,
-    out: *mut Fs80hBuffer,
-) -> Fs80hStatus {
-    with_guard(|| unsafe {
-        *required_out(out)? = buffer_from_vec(
-            required_mut(device, "device")?
-                .inner
-                .read_lfd_firmware_color_config()
-                .map_err(map_error)?
-                .bytes()
-                .to_vec(),
-        );
-        Ok(())
-    })
-}
-
-#[no_mangle]
 pub extern "C" fn fs80h_device_auto_capture(
     device: *mut Fs80hDevice,
-    timeout_ms: u64,
+    options: *const Fs80hAutoCaptureOptions,
     out: *mut *mut Fs80hFrame,
+    report: *mut Fs80hAutoCaptureReport,
 ) -> Fs80hStatus {
     with_guard(|| unsafe {
         let device = required_mut(device, "device")?;
         let out = required_out(out)?;
+        let options = auto_options(required_ref(options, "options")?)?;
         let frame = device
             .inner
-            .wait_for_finger_and_capture(std::time::Duration::from_millis(timeout_ms))
+            .wait_for_finger_present(&options, |_| true)
             .map_err(map_error)?;
+        if !report.is_null() {
+            *report = Fs80hAutoCaptureReport {
+                final_contact: presence(
+                    frame.presence_metrics_with_threshold(options.min_contact_ratio),
+                ),
+                removal_waited: u8::from(options.wait_for_removal),
+            };
+        }
         *out = Box::into_raw(Box::new(Fs80hFrame { inner: frame }));
         Ok(())
     })
@@ -445,6 +457,119 @@ pub extern "C" fn fs80h_frame_copy_pixels(
     with_guard(|| unsafe {
         *required_out(out)? =
             buffer_from_vec(required_ref(frame, "frame")?.inner.as_bytes().to_vec());
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn fs80h_frame_inverted(
+    frame: *const Fs80hFrame,
+    out: *mut *mut Fs80hFrame,
+) -> Fs80hStatus {
+    with_guard(|| unsafe {
+        *required_out(out)? = Box::into_raw(Box::new(Fs80hFrame {
+            inner: required_ref(frame, "frame")?.inner.inverted(),
+        }));
+        Ok(())
+    })
+}
+#[no_mangle]
+pub extern "C" fn fs80h_frame_contrast_percentiles(
+    frame: *const Fs80hFrame,
+    low: u8,
+    high: u8,
+    out: *mut *mut Fs80hFrame,
+) -> Fs80hStatus {
+    with_guard(|| unsafe {
+        if low >= high || high > 100 {
+            return Err((
+                Fs80hStatus::InvalidArgument,
+                "percentiles must be ordered in 0..=100".into(),
+            ));
+        }
+        *required_out(out)? = Box::into_raw(Box::new(Fs80hFrame {
+            inner: required_ref(frame, "frame")?
+                .inner
+                .contrast_stretched(low, high),
+        }));
+        Ok(())
+    })
+}
+#[no_mangle]
+pub extern "C" fn fs80h_frame_background_normalized(
+    frame: *const Fs80hFrame,
+    out: *mut *mut Fs80hFrame,
+) -> Fs80hStatus {
+    with_guard(|| unsafe {
+        *required_out(out)? = Box::into_raw(Box::new(Fs80hFrame {
+            inner: required_ref(frame, "frame")?.inner.background_normalized(),
+        }));
+        Ok(())
+    })
+}
+#[no_mangle]
+pub extern "C" fn fs80h_frame_ridge_enhanced(
+    frame: *const Fs80hFrame,
+    out: *mut *mut Fs80hFrame,
+) -> Fs80hStatus {
+    with_guard(|| unsafe {
+        *required_out(out)? = Box::into_raw(Box::new(Fs80hFrame {
+            inner: required_ref(frame, "frame")?.inner.ridge_enhanced(),
+        }));
+        Ok(())
+    })
+}
+#[no_mangle]
+pub extern "C" fn fs80h_frame_encode_image(
+    frame: *const Fs80hFrame,
+    format: u32,
+    out: *mut Fs80hBuffer,
+) -> Fs80hStatus {
+    with_guard(|| unsafe {
+        let format = match format {
+            1 => crate::FingerprintImageFormat::Png,
+            2 => crate::FingerprintImageFormat::Tiff,
+            3 => crate::FingerprintImageFormat::Pgm,
+            _ => return Err((Fs80hStatus::InvalidArgument, "unknown image format".into())),
+        };
+        *required_out(out)? = buffer_from_vec(
+            required_ref(frame, "frame")?
+                .inner
+                .encode_image(format)
+                .map_err(map_error)?,
+        );
+        Ok(())
+    })
+}
+#[no_mangle]
+pub extern "C" fn fs80h_device_read_descriptor(
+    device: *mut Fs80hDevice,
+    out: *mut Fs80hBuffer,
+) -> Fs80hStatus {
+    with_guard(|| unsafe {
+        *required_out(out)? = buffer_from_vec(
+            required_mut(device, "device")?
+                .inner
+                .read_descriptor_bytes()
+                .map_err(map_error)?
+                .to_vec(),
+        );
+        Ok(())
+    })
+}
+#[no_mangle]
+pub extern "C" fn fs80h_device_read_control_bytes(
+    device: *mut Fs80hDevice,
+    out: *mut Fs80hBuffer,
+) -> Fs80hStatus {
+    with_guard(|| unsafe {
+        *required_out(out)? = buffer_from_vec(
+            required_mut(device, "device")?
+                .inner
+                .read_control_bytes()
+                .map_err(map_error)?
+                .to_vec(),
+        );
         Ok(())
     })
 }

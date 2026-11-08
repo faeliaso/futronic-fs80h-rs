@@ -10,7 +10,7 @@ case "$(uname -s)" in
 esac
 
 cd "$root"
-cargo build --release --features native,lfd-experimental-decision
+cargo build --release --features native
 out="dist/futronic-fs80h-native-v${version}-${target}"
 rm -rf "$out"
 mkdir -p "$out/lib" "$out/include" "$out/docs"
@@ -27,5 +27,21 @@ else
 fi
 cp include/futronic_fs80h.h "$out/include/"
 cp README.md README_EN.md EXAMPLES.md LICENSE c_src/LICENSE-NIST "$out/docs/"
+driver_sha="$(shasum -a 256 "$out/lib/$library" | awk '{print $1}')"
+usb_sha="$(shasum -a 256 "$out/lib/$(basename "$libusb")" | awk '{print $1}')"
+header_sha="$(shasum -a 256 "$out/include/futronic_fs80h.h" | awk '{print $1}')"
+cat > "$out/manifest.json" <<EOF
+{
+  "version": "$version",
+  "abi_version": 2,
+  "target": "$target",
+  "enabled_features": ["wsq", "image-formats", "templates", "ansi-378", "matcher", "biometric-core", "mcc"],
+  "artifacts": {
+    "lib/$library": "$driver_sha",
+    "lib/$(basename "$libusb")": "$usb_sha",
+    "include/futronic_fs80h.h": "$header_sha"
+  }
+}
+EOF
 (cd dist && tar -czf "$(basename "$out").tar.gz" "$(basename "$out")")
 shasum -a 256 "dist/$(basename "$out").tar.gz" > "dist/$(basename "$out").tar.gz.sha256"
