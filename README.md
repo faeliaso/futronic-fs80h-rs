@@ -17,6 +17,14 @@ PNG/TIFF, templates, matching, auto-capture, quality analysis, and applications
 belong to the `fs80hctl` workspace. The previous C ABI, LFD experiments, and
 NFIQ2 are preserved in the `archive/ffi-lfd-research` branch.
 
+## Installation
+
+Add the published crate to an application with Cargo:
+
+```sh
+cargo add futronic-fs80h-rs
+```
+
 ## Requirements
 
 Building requires `libusb-1.0` and `pkg-config`. On Linux, grant the
@@ -36,6 +44,17 @@ hardware-free behavior. FS80H was validated on macOS 27.2 in frame-mode and
 variable-dose capture; run the
 [hardware validation guide](docs/HARDWARE_VALIDATION.md) for the remaining OS,
 model, and capture-mode combinations. Do not include biometric data in logs.
+
+### Pending hardware validation
+
+The following manual-validation coverage remains for a future hardware test
+session:
+
+- FS81H in frame-mode and variable-dose capture.
+- Linux with each available model in both capture modes.
+
+Record the operating system, crate version, observed geometry, capture mode,
+result, and logs without biometric data in the hardware validation guide.
 
 ## Validation
 
