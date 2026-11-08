@@ -35,7 +35,6 @@ impl std::error::Error for ParseDeviceIdError {}
 /// Standard string representations such as `"1:4"` or `"001:004"` can be parsed
 /// using [`FromStr`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DeviceId {
     /// Host USB bus number.
     pub bus_number: u8,
@@ -122,7 +121,6 @@ impl FromStr for DeviceId {
 
 /// Discovered Futronic scanner found on the USB bus without claiming exclusive access.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DiscoveredDevice {
     /// Topology identifier (`bus_number:address`).
     pub id: DeviceId,

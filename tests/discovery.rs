@@ -116,23 +116,3 @@ fn discovered_device_formats_display() {
     );
 }
 
-#[cfg(feature = "serde")]
-#[test]
-fn device_id_and_discovered_device_serde_roundtrip() {
-    let id = DeviceId::new(1, 4);
-    let serialized = serde_json::to_string(&id).unwrap();
-    let deserialized: DeviceId = serde_json::from_str(&serialized).unwrap();
-    assert_eq!(id, deserialized);
-
-    let dev = DiscoveredDevice {
-        id,
-        vendor_id: 0x1491,
-        product_id: 0x0020,
-        model: "FS80H".to_string(),
-        port_numbers: Some(vec![1, 2]),
-        product_name: Some("Futronic USB Fingerprint Scanner".to_string()),
-    };
-    let dev_json = serde_json::to_string(&dev).unwrap();
-    let dev_back: DiscoveredDevice = serde_json::from_str(&dev_json).unwrap();
-    assert_eq!(dev, dev_back);
-}

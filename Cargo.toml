@@ -1,136 +1,17 @@
 [package]
 name = "futronic-fs80h-rs"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Pure Rust userspace USB driver for Futronic FS80H and FS81H fingerprint scanners."
 license = "MIT"
 readme = "README.md"
-keywords = ["biometrics", "fingerprint", "usb", "futronic", "driver", "wsq"]
+keywords = ["fingerprint", "usb", "futronic", "driver"]
 categories = ["hardware-support"]
 
 [lib]
 name = "futronic_fs80h_rs"
-crate-type = ["rlib", "cdylib"]
-
-[features]
-default = ["wsq", "image-formats", "templates", "ansi-378", "matcher", "matcher-base64", "biometric-core", "mcc"]
-wsq = ["dep:cc"]
-image-formats = ["dep:png", "dep:tiff"]
-templates = ["dep:fprint-mindtct"]
-ansi-378 = ["templates"]
-matcher = ["templates"]
-matcher-base64 = ["matcher", "dep:base64"]
-biometric-core = ["dep:fprint-bozorth3", "dep:image", "dep:imageproc"]
-serde = ["dep:serde"]
-mcc = ["biometric-core", "dep:rayon", "serde"]
-# Links against an externally installed NIST NFIQ2 2.3 library. Set `NFIQ2_DIR`
-# to its installation prefix when enabling this feature.
-nfiq2 = ["dep:cc"]
-# Experimental FS80H-only acquisition telemetry for researching, but not claiming,
-# proprietary live-finger detection behavior.
-lfd-research = []
-# Opt-in, dataset-specific biometric-signal decision built from LFD research
-# metrics. It is disabled by default and is not equivalent to vendor TLFD.
-lfd-experimental-decision = ["lfd-research"]
-# Builds the operational C ABI used by native distribution packages.  Research
-# features deliberately remain opt-in and are never part of this bundle.
-native = ["wsq", "image-formats", "templates", "ansi-378", "matcher", "biometric-core", "mcc"]
 
 [dependencies]
 rusb = "0.9"
 thiserror = "1.0"
 tracing = { version = "0.1", default-features = false }
-fprint-mindtct = { version = "0.1", optional = true, features = ["unstable-diagnostics"] }
-fprint-bozorth3 = { version = "0.1", optional = true }
-image = { version = "0.25", default-features = false, features = ["png"], optional = true }
-imageproc = { version = "0.25", default-features = false, optional = true }
-png = { version = "0.18", optional = true }
-tiff = { version = "0.11", optional = true }
-base64 = { version = "0.22", optional = true }
-rayon = { version = "1.10", optional = true }
-serde = { version = "1.0", features = ["derive"], optional = true }
-
-[build-dependencies]
-cc = { version = "1.0", optional = true }
-
-[[example]]
-name = "capture_to_wsq"
-required-features = ["wsq"]
-
-[[example]]
-name = "capture_to_iso_template"
-required-features = ["templates"]
-
-[[example]]
-name = "capture_to_ansi_template"
-required-features = ["ansi-378"]
-
-[[example]]
-name = "verify_live_match"
-required-features = ["matcher"]
-
-[[example]]
-name = "calibrate_live_match"
-required-features = ["matcher"]
-
-[[example]]
-name = "capture_lfd_research"
-required-features = ["lfd-research"]
-
-[[example]]
-name = "probe_lfd_auxiliary"
-required-features = ["lfd-research"]
-
-[[example]]
-name = "probe_lfd_auxiliary_triplet"
-required-features = ["lfd-research"]
-
-[[example]]
-name = "probe_lfd_colored_cmos"
-required-features = ["lfd-research"]
-
-[[example]]
-name = "capture_lfd_colored_cmos"
-required-features = ["lfd-research"]
-
-[[example]]
-name = "analyze_lfd_auxiliary_triplet"
-required-features = ["lfd-research"]
-
-[[example]]
-name = "evaluate_lfd_experimental"
-required-features = ["lfd-experimental-decision"]
-
-[[example]]
-name = "capture_with_nfiq2_quality"
-required-features = ["nfiq2"]
-
-[[example]]
-name = "capture_and_match"
-required-features = ["biometric-core"]
-
-[[example]]
-name = "capture_and_mcc_match"
-required-features = ["mcc"]
-
-[[example]]
-name = "verify_two_fingers_mcc"
-required-features = ["mcc"]
-
-[[example]]
-name = "auto_capture_interactive"
-required-features = ["biometric-core"]
-
-[[example]]
-name = "capture_to_base64"
-required-features = ["biometric-core", "matcher-base64"]
-
-[dev-dependencies]
-image = { version = "0.25", default-features = false, features = ["png"] }
-criterion = { version = "0.5", features = ["html_reports"] }
-serde_json = "1.0"
-
-[[bench]]
-name = "mcc_benchmark"
-harness = false
-required-features = ["mcc"]
