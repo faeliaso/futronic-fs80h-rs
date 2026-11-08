@@ -2,7 +2,7 @@ use crate::error::{ScannerError, UsbOperation};
 use crate::protocol::{
     is_supported_product, BULK_CHUNK_SIZE, DEFAULT_IMAGE_DOSE, DEFAULT_TIMEOUT,
     EXPECTED_BULK_IN_ENDPOINT, EXPECTED_BULK_OUT_ENDPOINT, FRAME_CHUNK_TIMEOUT,
-    FRAME_MODE_GAIN_RESET, FS80_PID, FS80_RAW_SENSOR_STREAM_SIZE, FUTRONIC_VID, GET_CONTROL_BYTES,
+    FRAME_MODE_GAIN_RESET, FUTRONIC_VID, GET_CONTROL_BYTES,
     GET_IMAGE_VARIABLE_DOSE, RAW_SENSOR_STREAM_SIZE, SET_DIODES, SET_FRAME_MODE_GAIN,
 };
 use crate::RawFrame;
@@ -175,11 +175,7 @@ impl FutronicDevice {
         self.flush_bulk_in();
         self.write_command(&[GET_IMAGE_VARIABLE_DOSE, dose], UsbOperation::TriggerFrame)?;
         let endpoint = self.bulk_in_endpoint;
-        let expected_size = if self.info.product_id == FS80_PID {
-            FS80_RAW_SENSOR_STREAM_SIZE
-        } else {
-            RAW_SENSOR_STREAM_SIZE
-        };
+        let expected_size = RAW_SENSOR_STREAM_SIZE;
         read_complete_frame(expected_size, |chunk| {
             self.handle
                 .read_bulk(endpoint, chunk, FRAME_CHUNK_TIMEOUT)
