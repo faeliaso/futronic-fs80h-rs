@@ -1,8 +1,8 @@
 # futronic-fs80h-rs
 
-Driver USB Rust para os leitores ópticos Futronic FS80H e FS81H. O crate
-descobre leitores, reclama a interface USB, captura um frame L8 de 320×480 a
-500 DPI e controla os diodos de estado.
+Rust USB driver for Futronic FS80H and FS81H optical scanners. The crate
+discovers scanners, claims the USB interface, captures a 320×480 L8 frame at
+500 DPI, and controls the status LEDs.
 
 ```rust,no_run
 use futronic_fs80h_rs::FutronicDevice;
@@ -12,32 +12,32 @@ let frame = scanner.capture_frame()?;
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-O escopo deste repositório é exclusivamente transporte e aquisição do
-hardware. WSQ, PNG/TIFF, templates, matching, auto-captura, qualidade e
-aplicações pertencem ao workspace `fs80hctl`. A antiga ABI C, experimentos LFD
-e NFIQ2 foram preservados na branch `archive/ffi-lfd-research`.
+This repository is limited to hardware transport and acquisition. WSQ,
+PNG/TIFF, templates, matching, auto-capture, quality analysis, and applications
+belong to the `fs80hctl` workspace. The previous C ABI, LFD experiments, and
+NFIQ2 are preserved in the `archive/ffi-lfd-research` branch.
 
-## Dependências
+## Requirements
 
-O build exige `libusb-1.0` e `pkg-config`. Em Linux, conceda à aplicação
-permissão de acesso USB ao VID `1491`.
+Building requires `libusb-1.0` and `pkg-config`. On Linux, grant the
+application USB access to VID `1491`.
 
-O MSRV é Rust 1.70.
+The MSRV is Rust 1.70.
 
-## Compatibilidade
+## Compatibility
 
-| Modelo | PID | Stream bruto | Frame retornado | Modos |
+| Model | PID | Raw stream | Returned frame | Capture modes |
 | --- | --- | --- | --- | --- |
-| FS80H | `0020` | 320×800 | 320×480, 500 DPI | frame mode e dose variável |
-| FS81H | `0025` | 384×800 | 320×480, 500 DPI | frame mode e dose variável |
+| FS80H | `0020` | 320×800 | 320×480, 500 DPI | frame mode and variable dose |
+| FS81H | `0025` | 384×800 | 320×480, 500 DPI | frame mode and variable dose |
 
-O driver usa `libusb` em Linux e macOS. A execução automática cobre a lógica
-sem hardware. O FS80H foi validado em macOS 27.2 nos modos frame mode e dose
-variável; as demais combinações devem seguir o
-[roteiro de hardware](docs/HARDWARE_VALIDATION.md). Não registre dados
-biométricos nos logs.
+The driver uses `libusb` on Linux and macOS. Automated checks cover
+hardware-free behavior. FS80H was validated on macOS 27.2 in frame-mode and
+variable-dose capture; run the
+[hardware validation guide](docs/HARDWARE_VALIDATION.md) for the remaining OS,
+model, and capture-mode combinations. Do not include biometric data in logs.
 
-## Verificação
+## Validation
 
 ```sh
 make validate

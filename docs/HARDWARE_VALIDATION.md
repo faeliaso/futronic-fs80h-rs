@@ -1,54 +1,54 @@
-# Roteiro de validação com hardware
+# Hardware validation guide
 
-Execute este roteiro para cada leitor disponível. Não inclua imagens, bytes de
-frame, hashes de imagens ou qualquer dado biométrico no relatório ou nos logs.
+Run this guide for each available scanner. Do not include images, frame bytes,
+image hashes, or any biometric data in reports or logs.
 
-## Preparação
+## Preparation
 
 ```sh
 make validate
 cargo run --example list_devices
 ```
 
-O segundo comando deve listar o dispositivo com o VID `1491` e PID `0020`
-(FS80H) ou `0025` (FS81H). Se retornar uma lista vazia, confira o cabo, a
-alimentação, a permissão de acesso USB e se o processo de teste está no mesmo
-host que recebeu o dispositivo.
+The second command must list a device with VID `1491` and PID `0020` (FS80H)
+or `0025` (FS81H). If it returns an empty list, check the cable, power, USB
+access permissions, and whether the test process is running on the host that
+received the device.
 
-## Roteiro por modelo
+## Per-model procedure
 
-1. Registre SO, versão do crate, modelo e identificador USB fornecidos pelo
-   comando de descoberta.
-2. Com apenas um leitor conectado, execute uma captura no modo padrão e outra
-   no modo variável:
+1. Record the OS, crate version, model, and USB identifier returned by the
+   discovery command.
+2. With exactly one scanner connected, capture once in the default mode and
+   once with variable dose:
 
    ```sh
    cargo run --example capture_metadata
    cargo run --example capture_metadata -- --variable-dose
    ```
 
-   Os exemplos não gravam imagens ou bytes de frame: eles mostram apenas
-   metadados de descoberta e de geometria.
-3. Confirme somente a geometria esperada (320×480, 500 DPI), o modo e o
-   sucesso ou erro.
-4. Registre mensagens de erro sem anexar dados biométricos.
+   The examples do not write images or frame bytes; they output discovery and
+   geometry metadata only.
+3. Confirm only the expected geometry (320×480, 500 DPI), mode, and success or
+   failure.
+4. Record error messages without attaching biometric data.
 
-## Registro mínimo
+## Minimum record
 
-| Campo | Valor |
+| Field | Value |
 | --- | --- |
-| Data/hora | |
-| SO e versão | |
-| Versão do crate | |
-| Modelo e PID | |
-| Modo (padrão/variável) | |
-| Geometria observada | |
-| Resultado | |
-| Logs sem dados biométricos | |
+| Timestamp | |
+| OS and version | |
+| Crate version | |
+| Model and PID | |
+| Mode (default/variable) | |
+| Observed geometry | |
+| Result | |
+| Logs without biometric data | |
 
-## Resultados registrados
+## Recorded results
 
-| Data | SO | Crate | Modelo/PID | Modo | Geometria | Resultado | Log sem biometria |
+| Date | OS | Crate | Model/PID | Mode | Geometry | Result | Log without biometrics |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 2026-11-08 | macOS 27.2 (26B123) | 0.3.0 | FS80H / `0020` | dose variável (`166`) | 320×480, 500 DPI | sucesso | `capture succeeded: model=FS80H pid=0020 geometry=320x480 dpi=500 mode=variable-dose` |
-| 2026-11-08 | macOS 27.2 (26B123) | 0.3.0 | FS80H / `0020` | frame mode | 320×480, 500 DPI | sucesso | `capture succeeded: model=FS80H pid=0020 geometry=320x480 dpi=500 mode=frame-mode` |
+| 2026-11-08 | macOS 27.2 (26B123) | 0.3.0 | FS80H / `0020` | variable dose (`166`) | 320×480, 500 DPI | success | `capture succeeded: model=FS80H pid=0020 geometry=320x480 dpi=500 mode=variable-dose` |
+| 2026-11-08 | macOS 27.2 (26B123) | 0.3.0 | FS80H / `0020` | frame mode | 320×480, 500 DPI | success | `capture succeeded: model=FS80H pid=0020 geometry=320x480 dpi=500 mode=frame-mode` |
