@@ -160,14 +160,21 @@ impl FutronicDevice {
             UsbOperation::ConfigureFrameMode,
         )?;
         std::thread::sleep(std::time::Duration::from_millis(60));
-        let result = self.capture_raw_sensor_stream(dose);
+        let stream_result = self.capture_raw_sensor_stream(dose);
         let restore = self.write_command(
             &[SET_FRAME_MODE_GAIN, FRAME_MODE_GAIN_RESET],
             UsbOperation::ConfigureFrameMode,
         );
-        let stream = result?;
-        restore?;
-        RawFrame::from_raw_sensor_stream(&stream)
+        match stream_result {
+            Ok(stream) => {
+                restore?;
+                RawFrame::from_raw_sensor_stream(&stream)
+            }
+            Err(error) => {
+                let _ = restore;
+                Err(error)
+            }
+        }
     }
 
     /// Captures the unresampled 384x800 CMOS stream for diagnostics.
