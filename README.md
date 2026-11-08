@@ -46,3 +46,9 @@ cargo run --example list_devices
 
 See [the release pipeline](docs/RELEASING.md) for the GitHub Actions gates
 before publishing to crates.io.
+
+## Contributing and releases
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch and pull-request model,
+and [the release pipeline](docs/RELEASING.md) for versioning, tagging, and the
+protected crates.io publishing workflow.
