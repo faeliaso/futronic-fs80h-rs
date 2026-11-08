@@ -28,6 +28,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with: { targets: ${{ matrix.target }} }
+      - name: Validate Rust quality
+        run: |
+          cargo fmt --check
+          cargo check
+          cargo test
+          cargo clippy -- -D warnings
       - name: Install Linux libusb
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libusb-1.0-0-dev
@@ -37,7 +43,7 @@ jobs:
         run: cargo test --features native,lfd-experimental-decision --lib
       - name: Verify C header and linking (Unix)
         if: runner.os != 'Windows'
-        run: cc -Iinclude examples/native_smoke.c -Ltarget/${{ matrix.target }}/release -lfutronic_fs80h -o native-smoke
+        run: cc -Iinclude examples/native_smoke.c -Ltarget/${{ matrix.target }}/release -lfutronic_fs80h_rs -o native-smoke
       - name: Upload raw library for release assembly
         uses: actions/upload-artifact@v4
         with:
@@ -48,7 +54,9 @@ jobs:
             target/${{ matrix.target }}/release/*.dll
             target/${{ matrix.target }}/release/*.lib
             include/futronic_fs80h.h
-            docs/integracao-nativa.md
+            README.md
+            README_EN.md
+            EXAMPLES.md
             LICENSE
 
   release:

@@ -602,26 +602,16 @@ fn parse(bytes: &[u8]) -> Result<IsoTemplate, TemplateError> {
             ));
         }
         let mut j = i + 4;
-        let nc = usize::from(bytes[j]);
+        let nc = usize::from(extension_count(bytes, j)?);
         j += 1;
         for _ in 0..nc {
-            points.push(SingularPoint {
-                kind: SingularPointKind::Core,
-                x: u16::from_be_bytes(bytes[j..j + 2].try_into().unwrap()) & 0x3fff,
-                y: u16::from_be_bytes(bytes[j + 2..j + 4].try_into().unwrap()) & 0x3fff,
-                confidence: 100,
-            });
+            points.push(extension_point(bytes, j, SingularPointKind::Core)?);
             j += 4
         }
-        let nd = usize::from(bytes[j]);
+        let nd = usize::from(extension_count(bytes, j)?);
         j += 1;
         for _ in 0..nd {
-            points.push(SingularPoint {
-                kind: SingularPointKind::Delta,
-                x: u16::from_be_bytes(bytes[j..j + 2].try_into().unwrap()) & 0x3fff,
-                y: u16::from_be_bytes(bytes[j + 2..j + 4].try_into().unwrap()) & 0x3fff,
-                confidence: 100,
-            });
+            points.push(extension_point(bytes, j, SingularPointKind::Delta)?);
             j += 4
         }
         if j != bytes.len() {
@@ -690,26 +680,16 @@ fn parse_2005(bytes: &[u8]) -> Result<IsoTemplate, TemplateError> {
             ));
         }
         let mut j = i + 4;
-        let nc = usize::from(bytes[j]);
+        let nc = usize::from(extension_count(bytes, j)?);
         j += 1;
         for _ in 0..nc {
-            singular_points.push(SingularPoint {
-                kind: SingularPointKind::Core,
-                x: u16::from_be_bytes(bytes[j..j + 2].try_into().unwrap()) & 0x3fff,
-                y: u16::from_be_bytes(bytes[j + 2..j + 4].try_into().unwrap()) & 0x3fff,
-                confidence: 100,
-            });
+            singular_points.push(extension_point(bytes, j, SingularPointKind::Core)?);
             j += 4;
         }
-        let nd = usize::from(bytes[j]);
+        let nd = usize::from(extension_count(bytes, j)?);
         j += 1;
         for _ in 0..nd {
-            singular_points.push(SingularPoint {
-                kind: SingularPointKind::Delta,
-                x: u16::from_be_bytes(bytes[j..j + 2].try_into().unwrap()) & 0x3fff,
-                y: u16::from_be_bytes(bytes[j + 2..j + 4].try_into().unwrap()) & 0x3fff,
-                confidence: 100,
-            });
+            singular_points.push(extension_point(bytes, j, SingularPointKind::Delta)?);
             j += 4;
         }
         if j != bytes.len() {
@@ -725,6 +705,31 @@ fn parse_2005(bytes: &[u8]) -> Result<IsoTemplate, TemplateError> {
         singular_points,
         finger_position: pos,
         format: IsoFormat::Iso2005,
+    })
+}
+
+fn extension_count(bytes: &[u8], at: usize) -> Result<u8, TemplateError> {
+    bytes.get(at).copied().ok_or(TemplateError::InvalidTemplate(
+        "truncated core/delta extension",
+    ))
+}
+
+fn extension_point(
+    bytes: &[u8],
+    at: usize,
+    kind: SingularPointKind,
+) -> Result<SingularPoint, TemplateError> {
+    let point = bytes
+        .get(at..)
+        .and_then(|remaining| remaining.get(..4))
+        .ok_or(TemplateError::InvalidTemplate(
+            "truncated core/delta extension",
+        ))?;
+    Ok(SingularPoint {
+        kind,
+        x: u16::from_be_bytes([point[0], point[1]]) & 0x3fff,
+        y: u16::from_be_bytes([point[2], point[3]]) & 0x3fff,
+        confidence: 100,
     })
 }
 
@@ -787,5 +792,57 @@ mod tests {
         assert_eq!(parsed.minutiae(), ms);
         assert_eq!(parsed.format(), IsoFormat::Iso2005);
         assert_eq!(&bytes[..8], b"FMR\0 20\0");
+    }
+
+    #[test]
+    fn malformed_2011_extension_is_rejected_without_panicking() {
+        let mut bytes = serialize_2011(
+            &[Minutia {
+                x: 10,
+                y: 20,
+                kind: MinutiaKind::RidgeEnding,
+                angle: 64,
+                quality: 80,
+            }],
+            &[SingularPoint {
+                kind: SingularPointKind::Core,
+                x: 100,
+                y: 120,
+                confidence: 90,
+            }],
+            80,
+            FingerPosition::Unknown,
+        );
+        let extension_start = bytes.len() - 10;
+        bytes[extension_start + 4] = u8::MAX;
+
+        let result = std::panic::catch_unwind(|| IsoTemplate::from_bytes(&bytes));
+        assert!(matches!(result, Ok(Err(TemplateError::InvalidTemplate(_)))));
+    }
+
+    #[test]
+    fn malformed_2005_extension_is_rejected_without_panicking() {
+        let mut bytes = serialize_2005(
+            &[Minutia {
+                x: 10,
+                y: 20,
+                kind: MinutiaKind::RidgeEnding,
+                angle: 64,
+                quality: 80,
+            }],
+            &[SingularPoint {
+                kind: SingularPointKind::Core,
+                x: 100,
+                y: 120,
+                confidence: 90,
+            }],
+            80,
+            FingerPosition::Unknown,
+        );
+        let extension_start = bytes.len() - 10;
+        bytes[extension_start + 4] = u8::MAX;
+
+        let result = std::panic::catch_unwind(|| IsoTemplate::from_bytes(&bytes));
+        assert!(matches!(result, Ok(Err(TemplateError::InvalidTemplate(_)))));
     }
 }

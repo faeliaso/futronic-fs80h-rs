@@ -1,6 +1,4 @@
-use futronic_fs80h_rs::{
-    DeviceId, DeviceInfo, DiscoveredDevice, ParseDeviceIdError, ScannerError,
-};
+use futronic_fs80h_rs::{DeviceId, DeviceInfo, DiscoveredDevice, ParseDeviceIdError, ScannerError};
 
 #[test]
 fn device_id_constructs_and_formats() {

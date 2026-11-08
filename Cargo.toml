@@ -9,7 +9,7 @@ keywords = ["biometrics", "fingerprint", "usb", "futronic", "driver", "wsq"]
 categories = ["hardware-support"]
 
 [lib]
-name = "futronic_fs80h"
+name = "futronic_fs80h_rs"
 crate-type = ["rlib", "cdylib"]
 
 [features]

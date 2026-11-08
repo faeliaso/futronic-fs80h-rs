@@ -4,8 +4,8 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' "$root/Cargo.toml" | head -n1)"
 case "$(uname -s)" in
-  Darwin) target="darwin-$(uname -m)"; library="libfutronic_fs80h.dylib"; libusb="$(pkg-config --variable=libdir libusb-1.0)/libusb-1.0.0.dylib" ;;
-  Linux) target="linux-$(uname -m)"; library="libfutronic_fs80h.so"; libusb="$(pkg-config --variable=libdir libusb-1.0)/libusb-1.0.so.0" ;;
+  Darwin) target="darwin-$(uname -m)"; library="libfutronic_fs80h_rs.dylib"; libusb="$(pkg-config --variable=libdir libusb-1.0)/libusb-1.0.0.dylib" ;;
+  Linux) target="linux-$(uname -m)"; library="libfutronic_fs80h_rs.so"; libusb="$(pkg-config --variable=libdir libusb-1.0)/libusb-1.0.so.0" ;;
   *) echo "unsupported host; package on macOS or Linux" >&2; exit 1 ;;
 esac
 
@@ -25,6 +25,6 @@ else
   exit 1
 fi
 cp include/futronic_fs80h.h "$out/include/"
-cp docs/integracao-nativa.md docs/native-integration.md LICENSE c_src/LICENSE-NIST "$out/docs/"
+cp README.md README_EN.md EXAMPLES.md LICENSE c_src/LICENSE-NIST "$out/docs/"
 (cd dist && tar -czf "$(basename "$out").tar.gz" "$(basename "$out")")
 shasum -a 256 "dist/$(basename "$out").tar.gz" > "dist/$(basename "$out").tar.gz.sha256"
