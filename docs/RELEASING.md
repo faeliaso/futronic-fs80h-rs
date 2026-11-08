@@ -23,11 +23,19 @@ Neither workflow can upload a crate to crates.io.
 
 ## Publishing after approval
 
-Publishing must remain a separate, manually approved workflow. Create a
-protected GitHub Environment named `crates-io`, add a required reviewer, and
-store a crates.io token as its `CARGO_REGISTRY_TOKEN` secret. A publish workflow
-may then use that environment and run `cargo publish --locked`; it must be
-triggered manually after the release check for the matching tag succeeds.
+Publishing is a separate manual workflow. After the release check for a tag
+succeeds, open **Actions → Publish to crates.io → Run workflow**, select the
+same `vX.Y.Z` tag, enter `PUBLISH`, and start the workflow.
+
+The workflow only runs its publish job when all of these conditions hold:
+
+- the selected Git ref is a `v*` tag;
+- the tag version matches `Cargo.toml` exactly;
+- the confirmation text is `PUBLISH`.
+
+It uses the protected GitHub Environment named `crates-io` and its
+`CARGO_REGISTRY_TOKEN` environment secret. The token is available only to the
+`cargo publish --locked` step.
 
 Do not add the token to the repository, logs, or local configuration committed
 to source control.
