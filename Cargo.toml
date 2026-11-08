@@ -6,6 +6,9 @@ rust-version = "1.70"
 description = "Pure Rust userspace USB driver for Futronic FS80H and FS81H fingerprint scanners."
 license = "MIT"
 readme = "README.md"
+repository = "https://github.com/faeliaso/futronic-fs80h-rs"
+homepage = "https://github.com/faeliaso/futronic-fs80h-rs"
+documentation = "https://docs.rs/futronic-fs80h-rs"
 keywords = ["fingerprint", "usb", "futronic", "driver"]
 categories = ["hardware-support"]
 
