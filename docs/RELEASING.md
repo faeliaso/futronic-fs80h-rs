@@ -24,13 +24,14 @@ Neither workflow can upload a crate to crates.io.
 ## Publishing after approval
 
 Publishing is a separate manual workflow. After the release check for a tag
-succeeds, open **Actions → Publish to crates.io → Run workflow**, select the
-same `vX.Y.Z` tag, enter `PUBLISH`, and start the workflow.
+succeeds, open **Actions → Publish to crates.io → Run workflow**, leave the
+workflow branch as `main`, enter the same `vX.Y.Z` tag in the `tag` field,
+enter `PUBLISH`, and start the workflow.
 
 The workflow only runs its publish job when all of these conditions hold:
 
-- the selected Git ref is a `v*` tag;
-- the tag version matches `Cargo.toml` exactly;
+- the supplied tag begins with `v` and is checked out by the workflow;
+- the tag version matches its `Cargo.toml` exactly;
 - the confirmation text is `PUBLISH`.
 
 It uses the protected GitHub Environment named `crates-io` and its
