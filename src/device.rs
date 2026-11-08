@@ -2,8 +2,8 @@ use crate::error::{ScannerError, UsbOperation};
 use crate::protocol::{
     is_supported_product, BULK_CHUNK_SIZE, DEFAULT_IMAGE_DOSE, DEFAULT_TIMEOUT,
     EXPECTED_BULK_IN_ENDPOINT, EXPECTED_BULK_OUT_ENDPOINT, FRAME_CHUNK_TIMEOUT,
-    FRAME_MODE_GAIN_RESET, FUTRONIC_VID, GET_CONTROL_BYTES, GET_IMAGE_VARIABLE_DOSE,
-    RAW_SENSOR_STREAM_SIZE, SET_DIODES, SET_FRAME_MODE_GAIN,
+    FRAME_MODE_GAIN_RESET, FS80_PID, FS80_RAW_SENSOR_STREAM_SIZE, FUTRONIC_VID, GET_CONTROL_BYTES,
+    GET_IMAGE_VARIABLE_DOSE, RAW_SENSOR_STREAM_SIZE, SET_DIODES, SET_FRAME_MODE_GAIN,
 };
 use crate::RawFrame;
 use rusb::{Device, DeviceHandle, Direction, GlobalContext, TransferType};
@@ -177,12 +177,17 @@ impl FutronicDevice {
         }
     }
 
-    /// Captures the unresampled 384x800 CMOS stream for diagnostics.
+    /// Captures the unresampled CMOS stream for diagnostics.
     pub fn capture_raw_sensor_stream(&mut self, dose: u8) -> Result<Vec<u8>, ScannerError> {
         self.flush_bulk_in();
         self.write_command(&[GET_IMAGE_VARIABLE_DOSE, dose], UsbOperation::TriggerFrame)?;
         let endpoint = self.bulk_in_endpoint;
-        read_complete_frame(RAW_SENSOR_STREAM_SIZE, |chunk| {
+        let expected_size = if self.info.product_id == FS80_PID {
+            FS80_RAW_SENSOR_STREAM_SIZE
+        } else {
+            RAW_SENSOR_STREAM_SIZE
+        };
+        read_complete_frame(expected_size, |chunk| {
             self.handle
                 .read_bulk(endpoint, chunk, FRAME_CHUNK_TIMEOUT)
                 .map_err(|e| usb_error(UsbOperation::ReadFrame, e))

@@ -1,6 +1,7 @@
 use crate::{
-    ScannerError, RAW_FRAME_SIZE, RAW_SENSOR_HEIGHT, RAW_SENSOR_STREAM_SIZE, RAW_SENSOR_WIDTH,
-    SENSOR_DPI, SENSOR_HEIGHT, SENSOR_WIDTH,
+    ScannerError, FS80_RAW_SENSOR_STREAM_SIZE, FS80_RAW_SENSOR_WIDTH, RAW_FRAME_SIZE,
+    RAW_SENSOR_HEIGHT, RAW_SENSOR_STREAM_SIZE, RAW_SENSOR_WIDTH, SENSOR_DPI, SENSOR_HEIGHT,
+    SENSOR_WIDTH,
 };
 
 /// A complete uncompressed 8-bit grayscale image delivered by the scanner.
@@ -26,6 +27,15 @@ impl RawFrame {
             RAW_FRAME_SIZE => Ok(Self {
                 data: stream.to_vec(),
             }),
+            FS80_RAW_SENSOR_STREAM_SIZE => Ok(Self {
+                data: resample_bilinear(
+                    stream,
+                    FS80_RAW_SENSOR_WIDTH,
+                    RAW_SENSOR_HEIGHT,
+                    SENSOR_WIDTH,
+                    SENSOR_HEIGHT,
+                ),
+            }),
             RAW_SENSOR_STREAM_SIZE => Ok(Self {
                 data: resample_bilinear(
                     stream,
@@ -37,7 +47,7 @@ impl RawFrame {
             }),
             received => Err(ScannerError::IncompleteFrame {
                 received,
-                expected: RAW_SENSOR_STREAM_SIZE,
+                expected: FS80_RAW_SENSOR_STREAM_SIZE,
             }),
         }
     }

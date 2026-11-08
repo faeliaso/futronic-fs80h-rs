@@ -9,6 +9,11 @@ pub const RAW_SENSOR_HEIGHT: usize = 800;
 /// Total bytes in the complete raw CMOS sensor stream (384 x 800 = 307,200 bytes).
 pub const RAW_SENSOR_STREAM_SIZE: usize = RAW_SENSOR_WIDTH * RAW_SENSOR_HEIGHT;
 
+/// FS80H devices transmit 320 CMOS columns per line.
+pub const FS80_RAW_SENSOR_WIDTH: usize = 320;
+/// Total bytes in an FS80H raw CMOS stream (320 x 800).
+pub const FS80_RAW_SENSOR_STREAM_SIZE: usize = FS80_RAW_SENSOR_WIDTH * RAW_SENSOR_HEIGHT;
+
 /// Standard nominal biometric frame width (pixels).
 pub const SENSOR_WIDTH: usize = 320;
 /// Standard nominal biometric frame height (pixels).
