@@ -268,11 +268,22 @@ pub(crate) fn find_capture_interface(
             }
         }
     }
+    select_capture_interface(candidates)
+}
+
+/// Chooses the capture interface from the bulk endpoint candidates reported by
+/// a USB configuration descriptor. Kept separate from descriptor traversal so
+/// the selection policy can be tested without a physical scanner.
+fn select_capture_interface(
+    mut candidates: Vec<(u8, u8, u8)>,
+) -> Result<(u8, u8, u8), ScannerError> {
     candidates.sort_unstable();
     candidates.dedup();
+
     if candidates.len() == 1 {
         return Ok(candidates[0]);
     }
+
     candidates
         .into_iter()
         .find(|(_, out, input)| {
@@ -332,5 +343,127 @@ where
         Ok(buffer)
     } else {
         Err(ScannerError::IncompleteFrame { received, expected })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{read_complete_frame, select_capture_interface};
+    use crate::error::ScannerError;
+    use crate::protocol::{EXPECTED_BULK_IN_ENDPOINT, EXPECTED_BULK_OUT_ENDPOINT};
+    use std::collections::VecDeque;
+
+    fn read_chunks(
+        expected: usize,
+        chunks: impl IntoIterator<Item = Result<Vec<u8>, ScannerError>>,
+    ) -> Result<Vec<u8>, ScannerError> {
+        let mut chunks = chunks.into_iter().collect::<VecDeque<_>>();
+        read_complete_frame(expected, |destination| match chunks.pop_front() {
+            Some(Ok(chunk)) => {
+                assert!(chunk.len() <= destination.len());
+                destination[..chunk.len()].copy_from_slice(&chunk);
+                Ok(chunk.len())
+            }
+            Some(Err(error)) => Err(error),
+            None => Ok(0),
+        })
+    }
+
+    #[test]
+    fn frame_pipeline_reads_normal_chunks() {
+        let frame = read_chunks(8, [Ok(vec![1; 4]), Ok(vec![2; 4])]).unwrap();
+        assert_eq!(frame, vec![1, 1, 1, 1, 2, 2, 2, 2]);
+    }
+
+    #[test]
+    fn frame_pipeline_reads_short_chunks() {
+        let frame = read_chunks(5, [Ok(vec![1, 2]), Ok(vec![3]), Ok(vec![4, 5])]).unwrap();
+        assert_eq!(frame, vec![1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn frame_pipeline_rejects_empty_chunk_as_incomplete() {
+        let error = read_chunks(5, [Ok(vec![1, 2]), Ok(vec![])]).unwrap_err();
+        assert_eq!(
+            error,
+            ScannerError::IncompleteFrame {
+                received: 2,
+                expected: 5
+            }
+        );
+    }
+
+    #[test]
+    fn frame_pipeline_reports_bytes_received_before_timeout() {
+        let error = read_chunks(5, [Ok(vec![1, 2, 3]), Err(ScannerError::Timeout)]).unwrap_err();
+        assert_eq!(
+            error,
+            ScannerError::FrameReadTimeout {
+                received: 3,
+                expected: 5
+            }
+        );
+    }
+
+    #[test]
+    fn frame_pipeline_propagates_non_timeout_error() {
+        let error = read_chunks(
+            5,
+            [Err(ScannerError::IncompleteCommand {
+                written: 1,
+                expected: 2,
+            })],
+        )
+        .unwrap_err();
+        assert_eq!(
+            error,
+            ScannerError::IncompleteCommand {
+                written: 1,
+                expected: 2
+            }
+        );
+    }
+
+    #[test]
+    fn capture_interface_accepts_a_single_candidate() {
+        assert_eq!(
+            select_capture_interface(vec![(3, 0x04, 0x86)]),
+            Ok((3, 0x04, 0x86))
+        );
+    }
+
+    #[test]
+    fn capture_interface_prefers_expected_endpoints_among_multiple_candidates() {
+        assert_eq!(
+            select_capture_interface(vec![
+                (3, 0x04, 0x86),
+                (1, EXPECTED_BULK_OUT_ENDPOINT, EXPECTED_BULK_IN_ENDPOINT),
+            ]),
+            Ok((1, EXPECTED_BULK_OUT_ENDPOINT, EXPECTED_BULK_IN_ENDPOINT))
+        );
+    }
+
+    #[test]
+    fn capture_interface_deduplicates_equivalent_descriptors() {
+        assert_eq!(
+            select_capture_interface(vec![(1, 0x01, 0x82), (1, 0x01, 0x82)]),
+            Ok((1, 0x01, 0x82))
+        );
+    }
+
+    #[test]
+    fn capture_interface_rejects_ambiguous_or_empty_layouts() {
+        assert_eq!(
+            select_capture_interface(vec![(1, 0x01, 0x82), (2, 0x03, 0x84)]),
+            Ok((1, 0x01, 0x82))
+        );
+        assert_eq!(
+            select_capture_interface(vec![(1, 0x03, 0x84), (2, 0x04, 0x86)]),
+            Err(ScannerError::UnsupportedUsbLayout)
+        );
+        assert_eq!(
+            select_capture_interface(vec![]),
+            Err(ScannerError::UnsupportedUsbLayout)
+        );
     }
 }

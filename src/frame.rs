@@ -108,3 +108,76 @@ pub fn resample_bilinear(
     }
     output
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{resample_bilinear, RawFrame};
+    use crate::{
+        ScannerError, FS80_RAW_SENSOR_STREAM_SIZE, RAW_FRAME_SIZE, RAW_SENSOR_STREAM_SIZE,
+        SENSOR_HEIGHT, SENSOR_WIDTH,
+    };
+
+    #[test]
+    fn raw_frame_accepts_fs80h_sensor_stream() {
+        let mut stream = vec![0; FS80_RAW_SENSOR_STREAM_SIZE];
+        let last_row = stream.len() - 320;
+        let last_pixel = stream.len() - 1;
+        stream[0] = 11;
+        stream[319] = 22;
+        stream[last_row] = 33;
+        stream[last_pixel] = 44;
+
+        let frame = RawFrame::from_raw_sensor_stream(&stream).unwrap();
+
+        assert_eq!(frame.as_bytes().len(), RAW_FRAME_SIZE);
+        assert_eq!(frame.width(), SENSOR_WIDTH as u32);
+        assert_eq!(frame.height(), SENSOR_HEIGHT as u32);
+        assert_eq!(frame.as_bytes()[0], 11);
+        assert_eq!(frame.as_bytes()[SENSOR_WIDTH - 1], 22);
+        assert_eq!(frame.as_bytes()[RAW_FRAME_SIZE - SENSOR_WIDTH], 33);
+        assert_eq!(frame.as_bytes()[RAW_FRAME_SIZE - 1], 44);
+    }
+
+    #[test]
+    fn raw_frame_accepts_fs81h_sensor_stream() {
+        let mut stream = vec![0; RAW_SENSOR_STREAM_SIZE];
+        let last_row = stream.len() - 384;
+        let last_pixel = stream.len() - 1;
+        stream[0] = 11;
+        stream[383] = 22;
+        stream[last_row] = 33;
+        stream[last_pixel] = 44;
+
+        let frame = RawFrame::from_raw_sensor_stream(&stream).unwrap();
+
+        assert_eq!(frame.as_bytes().len(), RAW_FRAME_SIZE);
+        assert_eq!(frame.as_bytes()[0], 11);
+        assert_eq!(frame.as_bytes()[SENSOR_WIDTH - 1], 22);
+        assert_eq!(frame.as_bytes()[RAW_FRAME_SIZE - SENSOR_WIDTH], 33);
+        assert_eq!(frame.as_bytes()[RAW_FRAME_SIZE - 1], 44);
+    }
+
+    #[test]
+    fn raw_frame_rejects_unknown_sensor_stream_size() {
+        let error = RawFrame::from_raw_sensor_stream(&[0; 123]).unwrap_err();
+        assert_eq!(
+            error,
+            ScannerError::IncompleteFrame {
+                received: 123,
+                expected: FS80_RAW_SENSOR_STREAM_SIZE,
+            }
+        );
+    }
+
+    #[test]
+    fn bilinear_resampling_interpolates_a_predictable_small_image() {
+        let output = resample_bilinear(&[0, 100, 200, 255], 2, 2, 3, 3);
+        assert_eq!(output, vec![0, 50, 100, 100, 139, 178, 200, 228, 255]);
+    }
+
+    #[test]
+    fn bilinear_resampling_preserves_corners_when_downscaling() {
+        let output = resample_bilinear(&[0, 10, 20, 30, 40, 50, 60, 70, 80], 3, 3, 2, 2);
+        assert_eq!(output, vec![0, 20, 60, 80]);
+    }
+}
