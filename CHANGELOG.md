@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased
+
+### Added
+
+- Contributor and release-process documentation for the protected GitHub
+  Actions publication workflow.
+
 ## 0.1.0 - 2026-11-08
 
 ### Added
