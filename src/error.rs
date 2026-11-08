@@ -65,6 +65,11 @@ pub enum ScannerError {
     #[error("timed out while waiting for the scanner")]
     Timeout,
 
+    #[error(
+        "timed out while reading a fingerprint frame: received {received} of {expected} bytes"
+    )]
+    FrameReadTimeout { received: usize, expected: usize },
+
     #[error("incomplete fingerprint frame: received {received} of {expected} bytes")]
     IncompleteFrame { received: usize, expected: usize },
 

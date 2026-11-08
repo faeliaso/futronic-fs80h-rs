@@ -311,7 +311,13 @@ where
     let mut received = 0;
     while received < expected {
         let size = (expected - received).min(BULK_CHUNK_SIZE);
-        let count = read(&mut buffer[received..received + size])?;
+        let count = match read(&mut buffer[received..received + size]) {
+            Ok(count) => count,
+            Err(ScannerError::Timeout) => {
+                return Err(ScannerError::FrameReadTimeout { received, expected });
+            }
+            Err(error) => return Err(error),
+        };
         if count == 0 {
             break;
         }
