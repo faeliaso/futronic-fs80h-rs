@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## Unreleased
+## 0.1.0 - 2026-11-08
 
 ### Added
 
@@ -14,6 +14,8 @@ All notable changes to this project are documented in this file.
 - Tests ensuring a frame-mode restore failure never hides the original capture
   failure.
 - A `make validate` routine and CI checks for formatting, Clippy and tests.
+- A manually confirmed, tag-only crates.io publish workflow protected by the
+  `crates-io` GitHub Environment.
 
 ### Changed
 

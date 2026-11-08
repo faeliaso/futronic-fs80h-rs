@@ -1,6 +1,6 @@
 [package]
 name = "futronic-fs80h-rs"
-version = "0.3.0"
+version = "0.1.0"
 edition = "2021"
 rust-version = "1.71"
 description = "Pure Rust userspace USB driver for Futronic FS80H and FS81H fingerprint scanners."
