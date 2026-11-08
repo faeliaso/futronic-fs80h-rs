@@ -115,4 +115,3 @@ fn discovered_device_formats_display() {
         "FS80H [Futronic USB Fingerprint Scanner] at USB 1:4"
     );
 }
-

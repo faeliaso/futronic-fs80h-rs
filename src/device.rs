@@ -43,7 +43,9 @@ impl FutronicDevice {
             let descriptor = device
                 .device_descriptor()
                 .map_err(|e| usb_error(UsbOperation::ReadDescriptor, e))?;
-            if descriptor.vendor_id() == FUTRONIC_VID && is_supported_product(descriptor.product_id()) {
+            if descriptor.vendor_id() == FUTRONIC_VID
+                && is_supported_product(descriptor.product_id())
+            {
                 let (interface, out, input) = find_capture_interface(&device)?;
                 return Self::open_device(device, descriptor, interface, out, input);
             }
@@ -71,13 +73,17 @@ impl FutronicDevice {
         bulk_in_endpoint: u8,
     ) -> Result<Self, ScannerError> {
         #[allow(unused_mut)]
-        let mut handle = device.open().map_err(|e| usb_error(UsbOperation::OpenDevice, e))?;
+        let mut handle = device
+            .open()
+            .map_err(|e| usb_error(UsbOperation::OpenDevice, e))?;
         #[cfg(target_os = "linux")]
         let detached_kernel_driver = detach_kernel_driver(&mut handle, interface_number)?;
-        handle.claim_interface(interface_number).map_err(|e| match e {
-            rusb::Error::Busy => ScannerError::InterfaceBusy,
-            other => usb_error(UsbOperation::ClaimInterface, other),
-        })?;
+        handle
+            .claim_interface(interface_number)
+            .map_err(|e| match e {
+                rusb::Error::Busy => ScannerError::InterfaceBusy,
+                other => usb_error(UsbOperation::ClaimInterface, other),
+            })?;
         let info = DeviceInfo {
             vendor_id: descriptor.vendor_id(),
             product_id: descriptor.product_id(),
@@ -86,7 +92,10 @@ impl FutronicDevice {
             product_name: handle.read_product_string_ascii(&descriptor).ok(),
         };
         Ok(Self {
-            handle, interface_number, bulk_out_endpoint, bulk_in_endpoint,
+            handle,
+            interface_number,
+            bulk_out_endpoint,
+            bulk_in_endpoint,
             #[cfg(target_os = "linux")]
             detached_kernel_driver,
             info,
@@ -94,25 +103,44 @@ impl FutronicDevice {
     }
 
     #[must_use]
-    pub fn info(&self) -> &DeviceInfo { &self.info }
+    pub fn info(&self) -> &DeviceInfo {
+        &self.info
+    }
 
     pub fn read_control_bytes(&mut self) -> Result<[u8; 7], ScannerError> {
         self.write_command(&[GET_CONTROL_BYTES], UsbOperation::QueryControlBytes)?;
         let mut response = [0; 512];
-        let received = self.handle.read_bulk(self.bulk_in_endpoint, &mut response, DEFAULT_TIMEOUT)
+        let received = self
+            .handle
+            .read_bulk(self.bulk_in_endpoint, &mut response, DEFAULT_TIMEOUT)
             .map_err(|e| usb_error(UsbOperation::QueryControlBytes, e))?;
-        if received < 7 { return Err(ScannerError::IncompleteResponse { received, expected: 7 }); }
+        if received < 7 {
+            return Err(ScannerError::IncompleteResponse {
+                received,
+                expected: 7,
+            });
+        }
         let mut bytes = [0; 7];
         bytes.copy_from_slice(&response[..7]);
         Ok(bytes)
     }
 
     pub fn read_descriptor_bytes(&mut self) -> Result<[u8; 64], ScannerError> {
-        self.write_command(&[crate::protocol::GET_DESCRIPTOR], UsbOperation::QueryControlBytes)?;
+        self.write_command(
+            &[crate::protocol::GET_DESCRIPTOR],
+            UsbOperation::QueryControlBytes,
+        )?;
         let mut response = [0; 512];
-        let received = self.handle.read_bulk(self.bulk_in_endpoint, &mut response, DEFAULT_TIMEOUT)
+        let received = self
+            .handle
+            .read_bulk(self.bulk_in_endpoint, &mut response, DEFAULT_TIMEOUT)
             .map_err(|e| usb_error(UsbOperation::QueryControlBytes, e))?;
-        if received < 64 { return Err(ScannerError::IncompleteResponse { received, expected: 64 }); }
+        if received < 64 {
+            return Err(ScannerError::IncompleteResponse {
+                received,
+                expected: 64,
+            });
+        }
         let mut bytes = [0; 64];
         bytes.copy_from_slice(&response[..64]);
         Ok(bytes)
@@ -127,10 +155,16 @@ impl FutronicDevice {
     }
 
     pub fn capture_frame_with_frame_mode(&mut self, dose: u8) -> Result<RawFrame, ScannerError> {
-        self.write_command(&[SET_FRAME_MODE_GAIN, 0x80 | (dose >> 1)], UsbOperation::ConfigureFrameMode)?;
+        self.write_command(
+            &[SET_FRAME_MODE_GAIN, 0x80 | (dose >> 1)],
+            UsbOperation::ConfigureFrameMode,
+        )?;
         std::thread::sleep(std::time::Duration::from_millis(60));
         let result = self.capture_raw_sensor_stream(dose);
-        let restore = self.write_command(&[SET_FRAME_MODE_GAIN, FRAME_MODE_GAIN_RESET], UsbOperation::ConfigureFrameMode);
+        let restore = self.write_command(
+            &[SET_FRAME_MODE_GAIN, FRAME_MODE_GAIN_RESET],
+            UsbOperation::ConfigureFrameMode,
+        );
         let stream = result?;
         restore?;
         RawFrame::from_raw_sensor_stream(&stream)
@@ -141,25 +175,50 @@ impl FutronicDevice {
         self.flush_bulk_in();
         self.write_command(&[GET_IMAGE_VARIABLE_DOSE, dose], UsbOperation::TriggerFrame)?;
         let endpoint = self.bulk_in_endpoint;
-        read_complete_frame(RAW_SENSOR_STREAM_SIZE, |chunk| self.handle.read_bulk(endpoint, chunk, FRAME_CHUNK_TIMEOUT)
-            .map_err(|e| usb_error(UsbOperation::ReadFrame, e)))
+        read_complete_frame(RAW_SENSOR_STREAM_SIZE, |chunk| {
+            self.handle
+                .read_bulk(endpoint, chunk, FRAME_CHUNK_TIMEOUT)
+                .map_err(|e| usb_error(UsbOperation::ReadFrame, e))
+        })
     }
 
     pub fn set_diodes(&mut self, green: bool, red: bool) -> Result<(), ScannerError> {
-        self.write_command(&[SET_DIODES, u8::from(green), u8::from(red)], UsbOperation::SetDiodes)
+        self.write_command(
+            &[SET_DIODES, u8::from(green), u8::from(red)],
+            UsbOperation::SetDiodes,
+        )
     }
 
     fn flush_bulk_in(&mut self) {
         let mut discard = [0; BULK_CHUNK_SIZE];
-        while let Ok(count) = self.handle.read_bulk(self.bulk_in_endpoint, &mut discard, std::time::Duration::from_millis(15)) {
-            if count == 0 { break; }
+        while let Ok(count) = self.handle.read_bulk(
+            self.bulk_in_endpoint,
+            &mut discard,
+            std::time::Duration::from_millis(15),
+        ) {
+            if count == 0 {
+                break;
+            }
         }
     }
 
-    fn write_command(&mut self, command: &[u8], operation: UsbOperation) -> Result<(), ScannerError> {
-        let written = self.handle.write_bulk(self.bulk_out_endpoint, command, DEFAULT_TIMEOUT)
+    fn write_command(
+        &mut self,
+        command: &[u8],
+        operation: UsbOperation,
+    ) -> Result<(), ScannerError> {
+        let written = self
+            .handle
+            .write_bulk(self.bulk_out_endpoint, command, DEFAULT_TIMEOUT)
             .map_err(|e| usb_error(operation, e))?;
-        if written == command.len() { Ok(()) } else { Err(ScannerError::IncompleteCommand { written, expected: command.len() }) }
+        if written == command.len() {
+            Ok(())
+        } else {
+            Err(ScannerError::IncompleteCommand {
+                written,
+                expected: command.len(),
+            })
+        }
     }
 }
 
@@ -167,49 +226,93 @@ impl Drop for FutronicDevice {
     fn drop(&mut self) {
         let _ = self.handle.release_interface(self.interface_number);
         #[cfg(target_os = "linux")]
-        if self.detached_kernel_driver { let _ = self.handle.attach_kernel_driver(self.interface_number); }
+        if self.detached_kernel_driver {
+            let _ = self.handle.attach_kernel_driver(self.interface_number);
+        }
     }
 }
 
-pub(crate) fn find_capture_interface(device: &Device<GlobalContext>) -> Result<(u8, u8, u8), ScannerError> {
-    let config = device.active_config_descriptor().map_err(|e| usb_error(UsbOperation::ReadDescriptor, e))?;
+pub(crate) fn find_capture_interface(
+    device: &Device<GlobalContext>,
+) -> Result<(u8, u8, u8), ScannerError> {
+    let config = device
+        .active_config_descriptor()
+        .map_err(|e| usb_error(UsbOperation::ReadDescriptor, e))?;
     let mut candidates = Vec::new();
     for interface in config.interfaces() {
         for descriptor in interface.descriptors() {
-            let mut input = Vec::new(); let mut output = Vec::new();
+            let mut input = Vec::new();
+            let mut output = Vec::new();
             for endpoint in descriptor.endpoint_descriptors() {
                 if endpoint.transfer_type() == TransferType::Bulk {
-                    match endpoint.direction() { Direction::In => input.push(endpoint.address()), Direction::Out => output.push(endpoint.address()) }
+                    match endpoint.direction() {
+                        Direction::In => input.push(endpoint.address()),
+                        Direction::Out => output.push(endpoint.address()),
+                    }
                 }
             }
-            if input.len() == 1 && output.len() == 1 { candidates.push((descriptor.interface_number(), output[0], input[0])); }
+            if input.len() == 1 && output.len() == 1 {
+                candidates.push((descriptor.interface_number(), output[0], input[0]));
+            }
         }
     }
-    candidates.sort_unstable(); candidates.dedup();
-    if candidates.len() == 1 { return Ok(candidates[0]); }
-    candidates.into_iter().find(|(_, out, input)| *out == EXPECTED_BULK_OUT_ENDPOINT && *input == EXPECTED_BULK_IN_ENDPOINT)
+    candidates.sort_unstable();
+    candidates.dedup();
+    if candidates.len() == 1 {
+        return Ok(candidates[0]);
+    }
+    candidates
+        .into_iter()
+        .find(|(_, out, input)| {
+            *out == EXPECTED_BULK_OUT_ENDPOINT && *input == EXPECTED_BULK_IN_ENDPOINT
+        })
         .ok_or(ScannerError::UnsupportedUsbLayout)
 }
 
 #[cfg(target_os = "linux")]
-fn detach_kernel_driver(handle: &mut DeviceHandle<GlobalContext>, interface: u8) -> Result<bool, ScannerError> {
-    let active = handle.kernel_driver_active(interface).map_err(|e| usb_error(UsbOperation::DetachKernelDriver, e))?;
-    if active { handle.detach_kernel_driver(interface).map_err(|e| usb_error(UsbOperation::DetachKernelDriver, e))?; }
+fn detach_kernel_driver(
+    handle: &mut DeviceHandle<GlobalContext>,
+    interface: u8,
+) -> Result<bool, ScannerError> {
+    let active = handle
+        .kernel_driver_active(interface)
+        .map_err(|e| usb_error(UsbOperation::DetachKernelDriver, e))?;
+    if active {
+        handle
+            .detach_kernel_driver(interface)
+            .map_err(|e| usb_error(UsbOperation::DetachKernelDriver, e))?;
+    }
     Ok(active)
 }
 
 pub(crate) fn usb_error(operation: UsbOperation, error: rusb::Error) -> ScannerError {
-    if error == rusb::Error::Timeout { ScannerError::Timeout } else { ScannerError::Usb { operation, message: error.to_string() } }
+    if error == rusb::Error::Timeout {
+        ScannerError::Timeout
+    } else {
+        ScannerError::Usb {
+            operation,
+            message: error.to_string(),
+        }
+    }
 }
 
 fn read_complete_frame<F>(expected: usize, mut read: F) -> Result<Vec<u8>, ScannerError>
-where F: FnMut(&mut [u8]) -> Result<usize, ScannerError> {
-    let mut buffer = vec![0; expected]; let mut received = 0;
+where
+    F: FnMut(&mut [u8]) -> Result<usize, ScannerError>,
+{
+    let mut buffer = vec![0; expected];
+    let mut received = 0;
     while received < expected {
         let size = (expected - received).min(BULK_CHUNK_SIZE);
         let count = read(&mut buffer[received..received + size])?;
-        if count == 0 { break; }
+        if count == 0 {
+            break;
+        }
         received += count;
     }
-    if received == expected { Ok(buffer) } else { Err(ScannerError::IncompleteFrame { received, expected }) }
+    if received == expected {
+        Ok(buffer)
+    } else {
+        Err(ScannerError::IncompleteFrame { received, expected })
+    }
 }

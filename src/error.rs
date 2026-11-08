@@ -73,5 +73,4 @@ pub enum ScannerError {
 
     #[error("incomplete USB command write: sent {written} of {expected} bytes")]
     IncompleteCommand { written: usize, expected: usize },
-
 }
