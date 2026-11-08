@@ -148,3 +148,14 @@ pub enum WsqError {
     #[error("input WSQ buffer is empty or corrupted")]
     EmptyBuffer,
 }
+
+/// Failures returned while encoding a fingerprint image container.
+#[cfg(feature = "image-formats")]
+#[derive(Error, Debug)]
+pub enum ImageEncodingError {
+    #[error("PNG encoding failed: {0}")]
+    Png(String),
+
+    #[error("TIFF encoding failed: {0}")]
+    Tiff(String),
+}

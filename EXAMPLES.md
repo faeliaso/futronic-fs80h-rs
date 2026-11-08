@@ -49,6 +49,7 @@ posicione o dedo antes de confirmar.
 | Inspecionar USB | `cargo run --example inspect_usb` | Lê descritores; não captura. |
 | Listar/abrir por ID | `cargo run --example list_and_open_by_id -- 1:4` | Lista e captura do ID opcional `barramento:endereço`. |
 | Captura PNG | `cargo run --example capture_to_png` | Gera quatro PNGs: calibrado, invertido, normalizado e realçado. |
+| Exportação sem perdas | API `RawFrame::encode_image` | Produz PNG, TIFF/Deflate ou PGM com os pixels atuais do frame. |
 | Auto-capture | `cargo run --example auto_capture_interactive` | Aguarda contato e grava `auto_captured_fingerprint.png`. |
 | Base64 | `cargo run --example capture_to_base64` | Grava PNG/Base64 e Base64 WSQ. |
 | LED verde | `cargo run --example capture_with_green_diode` | Captura dose `0xA0` e gera PNG. |
@@ -61,8 +62,36 @@ posicione o dedo antes de confirmar.
 | Calibração matcher | `cargo run --release --example calibrate_live_match -- calibration.csv` | Coleta scores e grava CSV opcional. |
 | Dois dedos/MCC | `cargo run --release --example verify_two_fingers_mcc` | Compare mesmo dedo ou dedos diferentes interativamente. |
 
-Os formatos PNG, WSQ, `.iso19794` e `calibration.csv` são ignorados por Git,
+Os formatos PNG, TIFF, PGM, WSQ, `.iso19794` e `calibration.csv` são ignorados por Git,
 mas exigem armazenamento e descarte adequados.
+
+## Exportação de imagens sem perdas
+
+O recurso `image-formats` vem habilitado por padrão. `encode_image` retorna os
+bytes em memória e nunca aplica inversão, normalização ou realce por conta
+própria: chame a transformação desejada antes de exportar. PNG e TIFF carregam
+metadados físicos de 500 DPI; PGM P5 é destinado a diagnóstico e não possui
+campo padronizado para DPI. Para intercâmbio biométrico a 500 DPI, mantenha
+WSQ como o formato de referência.
+
+```rust,no_run
+use futronic_fs80h_rs::{FingerprintImageFormat, FutronicDevice};
+
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let mut scanner = FutronicDevice::open_first()?;
+let frame = scanner.capture_frame()?;
+
+std::fs::write(
+    "fingerprint.tiff",
+    frame.encode_image(FingerprintImageFormat::Tiff)?,
+)?;
+std::fs::write(
+    "fingerprint.pgm",
+    frame.encode_image(FingerprintImageFormat::Pgm)?,
+)?;
+# Ok(())
+# }
+```
 
 ## NFIQ2 opcional
 

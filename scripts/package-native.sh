@@ -17,6 +17,7 @@ mkdir -p "$out/lib" "$out/include" "$out/docs"
 cp "target/release/$library" "$out/lib/"
 if [ -f "$libusb" ]; then cp -L "$libusb" "$out/lib/"; else echo "libusb runtime not found: $libusb" >&2; exit 1; fi
 if [ "$(uname -s)" = Darwin ]; then
+  install_name_tool -id "@rpath/$library" "$out/lib/$library"
   install_name_tool -change "$(otool -L "$out/lib/$library" | awk 'NR == 3 {print $1}')" '@loader_path/libusb-1.0.0.dylib' "$out/lib/$library"
 elif command -v patchelf >/dev/null; then
   patchelf --set-rpath '$ORIGIN' "$out/lib/$library"

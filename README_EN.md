@@ -64,6 +64,7 @@ For multiple devices, use `list_devices`, `DeviceId`, and `open_device_by_id`;
 | Capture and discovery | `FutronicDevice`, `RawFrame`, `DeviceId` | default | Direct capture, diodes, and bus/address selection. |
 | Presence/auto-capture | `evaluate_frame_presence`, `AutoCaptureOptions` | default | Measures contact and stabilizes capture; not liveness. |
 | WSQ | `RawFrame::to_wsq`, `RawFrame::from_wsq` | `wsq` | Locally compiled NBIS encoder/decoder. |
+| Lossless images | `RawFrame::encode_image` | `image-formats` | PNG and TIFF at 500 DPI; PGM for technical diagnostics. |
 | Templates | `IsoTemplate`, `AnsiTemplate`, `TemplateOptions` | `templates`, `ansi-378` | One-finger ISO 2005/2011 and ANSI 378. |
 | Matcher | `Matcher` | `matcher`, `matcher-base64` | 1:1 verification, 1:N search, explicit Base64. |
 | Biometric core | `extract_minutiae`, Bozorth3 | `biometric-core` | Minutiae extraction, rendering, and local comparison. |
@@ -73,8 +74,8 @@ For multiple devices, use `list_devices`, `DeviceId`, and `open_device_by_id`;
 | Signal gate | `decide_lfd_experimental` | `lfd-experimental-decision` | Dataset-calibrated policy; not TLFD. |
 | C ABI | `futronic_fs80h.h` | `native` | Dynamic library for other runtimes. |
 
-Default features include WSQ, templates, ANSI, matcher, biometric core, and
-MCC. `native` enables experimental LFD decision because the ABI exports it.
+Default features include WSQ, image formats, templates, ANSI, matcher, biometric
+core, and MCC. `native` enables experimental LFD decision because the ABI exports it.
 `nfiq2` requires `NFIQ2_DIR` to identify an installation with `include/` and
 `lib/` directories.
 
@@ -90,6 +91,18 @@ ISO/IEC 19794-2:2011 is default; ISO 2005 + Cor.1:2009 and ANSI
 378-2004/2009/2009 AM1 are explicit alternatives. Parsers validate supported
 profiles and reject malformed records. Templates, like images, are sensitive
 biometric data.
+
+`RawFrame::encode_image` exports PNG, TIFF, and PGM without altering the frame's
+current pixels. PNG and TIFF are 8-bit grayscale with 500-DPI metadata; TIFF uses
+lossless Deflate compression. PGM (P5) is for technical tools and has no
+standardized DPI metadata. These containers do not replace WSQ for biometric interchange.
+
+```rust
+use futronic_fs80h_rs::FingerprintImageFormat;
+
+let png = frame.encode_image(FingerprintImageFormat::Png)?;
+let tiff = frame.encode_image(FingerprintImageFormat::Tiff)?;
+```
 
 `Matcher` compares ISO and ANSI records 1:1, returns score-sorted 1:N
 candidates, and supplies format-explicit Base64. Demonstration thresholds are

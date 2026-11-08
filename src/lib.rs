@@ -22,6 +22,8 @@ pub mod error;
 #[cfg(feature = "native")]
 mod ffi;
 pub mod frame;
+#[cfg(feature = "image-formats")]
+pub mod image_format;
 #[cfg(feature = "lfd-research")]
 pub mod lfd;
 #[cfg(feature = "matcher")]
@@ -47,10 +49,14 @@ pub use discovery::{
     list_devices, open_device_by_id, open_single_device, DeviceId, DiscoveredDevice,
     ParseDeviceIdError,
 };
+#[cfg(feature = "image-formats")]
+pub use error::ImageEncodingError;
 #[cfg(feature = "wsq")]
 pub use error::WsqError;
 pub use error::{ScannerError, UsbOperation};
 pub use frame::{resample_bilinear, RawFrame};
+#[cfg(feature = "image-formats")]
+pub use image_format::FingerprintImageFormat;
 #[cfg(feature = "lfd-research")]
 pub use lfd::{
     analyze_lfd_auxiliary_frames, analyze_lfd_auxiliary_frames_with_threshold,

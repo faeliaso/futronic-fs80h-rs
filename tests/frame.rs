@@ -74,3 +74,95 @@ fn background_normalized_and_ridge_enhanced_preserve_geometry() {
     assert_eq!(enh.height(), SENSOR_HEIGHT as u32);
     assert_eq!(enh.as_bytes().len(), RAW_FRAME_SIZE);
 }
+
+#[cfg(feature = "image-formats")]
+fn patterned_frame() -> RawFrame {
+    let pixels = (0..RAW_FRAME_SIZE)
+        .map(|index| (index % 251) as u8)
+        .collect();
+    RawFrame::new(pixels).expect("generated pattern has the required geometry")
+}
+
+#[cfg(feature = "image-formats")]
+#[test]
+fn png_export_round_trips_pixels_and_records_sensor_dpi() {
+    use futronic_fs80h_rs::FingerprintImageFormat;
+    use std::io::Cursor;
+
+    let frame = patterned_frame();
+    let encoded = frame
+        .encode_image(FingerprintImageFormat::Png)
+        .expect("PNG encoding succeeds");
+    let decoder = png::Decoder::new(Cursor::new(encoded));
+    let mut reader = decoder.read_info().expect("encoded PNG is readable");
+    let dimensions = reader.info().pixel_dims.expect("PNG has pHYs metadata");
+    assert_eq!(dimensions.xppu, 19_685);
+    assert_eq!(dimensions.yppu, 19_685);
+    assert_eq!(dimensions.unit, png::Unit::Meter);
+
+    let mut decoded = vec![0; reader.output_buffer_size().expect("known output size")];
+    let output = reader.next_frame(&mut decoded).expect("pixels decode");
+    assert_eq!(output.width, SENSOR_WIDTH as u32);
+    assert_eq!(output.height, SENSOR_HEIGHT as u32);
+    assert_eq!(output.color_type, png::ColorType::Grayscale);
+    assert_eq!(&decoded[..output.buffer_size()], frame.as_bytes());
+}
+
+#[cfg(feature = "image-formats")]
+#[test]
+fn tiff_export_round_trips_pixels_and_records_sensor_dpi() {
+    use futronic_fs80h_rs::FingerprintImageFormat;
+    use std::io::Cursor;
+    use tiff::{decoder::DecodingResult, tags::Tag, ColorType};
+
+    let frame = patterned_frame();
+    let encoded = frame
+        .encode_image(FingerprintImageFormat::Tiff)
+        .expect("TIFF encoding succeeds");
+    let mut decoder =
+        tiff::decoder::Decoder::new(Cursor::new(encoded)).expect("encoded TIFF is readable");
+    assert_eq!(
+        decoder.dimensions().expect("dimensions available"),
+        (SENSOR_WIDTH as u32, SENSOR_HEIGHT as u32)
+    );
+    assert_eq!(
+        decoder.colortype().expect("color type available"),
+        ColorType::Gray(8)
+    );
+    assert_eq!(
+        decoder
+            .get_tag_u32_vec(Tag::XResolution)
+            .expect("x DPI tag"),
+        vec![500, 1]
+    );
+    assert_eq!(
+        decoder
+            .get_tag_u32_vec(Tag::YResolution)
+            .expect("y DPI tag"),
+        vec![500, 1]
+    );
+    assert_eq!(
+        decoder
+            .get_tag_unsigned::<u16>(Tag::ResolutionUnit)
+            .expect("resolution unit tag"),
+        2
+    );
+    match decoder.read_image().expect("pixels decode") {
+        DecodingResult::U8(pixels) => assert_eq!(pixels, frame.as_bytes()),
+        other => panic!("expected 8-bit grayscale TIFF, got {other:?}"),
+    }
+}
+
+#[cfg(feature = "image-formats")]
+#[test]
+fn pgm_export_has_binary_header_and_exact_pixels() {
+    use futronic_fs80h_rs::FingerprintImageFormat;
+
+    let frame = patterned_frame();
+    let encoded = frame
+        .encode_image(FingerprintImageFormat::Pgm)
+        .expect("PGM encoding cannot fail in memory");
+    let header = b"P5\n320 480\n255\n";
+    assert!(encoded.starts_with(header));
+    assert_eq!(&encoded[header.len()..], frame.as_bytes());
+}
