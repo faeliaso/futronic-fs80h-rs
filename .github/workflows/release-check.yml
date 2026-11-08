@@ -23,8 +23,8 @@ jobs:
       - name: Validate source tree
         run: make validate
       - name: Test documentation
-        run: cargo test --doc --locked
+        run: cargo test --doc
       - name: Build release artifact
-        run: cargo build --release --locked
+        run: cargo build --release
       - name: Verify the publishable package
-        run: cargo publish --dry-run --locked
+        run: cargo publish --dry-run

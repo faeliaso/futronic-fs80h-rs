@@ -35,7 +35,7 @@ The workflow only runs its publish job when all of these conditions hold:
 
 It uses the protected GitHub Environment named `crates-io` and its
 `CARGO_REGISTRY_TOKEN` environment secret. The token is available only to the
-`cargo publish --locked` step.
+`cargo publish` step.
 
 Do not add the token to the repository, logs, or local configuration committed
 to source control.
