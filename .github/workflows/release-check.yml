@@ -1,0 +1,30 @@
+name: Release Check
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install libusb development files
+        run: sudo apt-get update && sudo apt-get install -y libusb-1.0-0-dev pkg-config
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Validate source tree
+        run: make validate
+      - name: Test documentation
+        run: cargo test --doc --locked
+      - name: Build release artifact
+        run: cargo build --release --locked
+      - name: Verify the publishable package
+        run: cargo publish --dry-run --locked

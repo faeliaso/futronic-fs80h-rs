@@ -43,3 +43,6 @@ model, and capture-mode combinations. Do not include biometric data in logs.
 make validate
 cargo run --example list_devices
 ```
+
+See [the release pipeline](docs/RELEASING.md) for the GitHub Actions gates
+before publishing to crates.io.
