@@ -63,12 +63,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\nOpened scanner info:");
     println!("  Model/Product : {:?}", scanner.info().product_name);
-    println!("  USB VID:PID   : {:04X}:{:04X}", scanner.info().vendor_id, scanner.info().product_id);
-    println!("  USB Bus:Addr  : {}:{}", scanner.info().bus_number, scanner.info().address);
+    println!(
+        "  USB VID:PID   : {:04X}:{:04X}",
+        scanner.info().vendor_id,
+        scanner.info().product_id
+    );
+    println!(
+        "  USB Bus:Addr  : {}:{}",
+        scanner.info().bus_number,
+        scanner.info().address
+    );
     println!("  Device ID     : {}", scanner.info().id());
 
     // 3. Test capturing one frame from the opened scanner
-    println!("\nCapturing a test frame from device {}...", scanner.info().id());
+    println!(
+        "\nCapturing a test frame from device {}...",
+        scanner.info().id()
+    );
     let frame = scanner.capture_frame()?;
     println!(
         "Frame captured: {}x{} @ {} DPI ({} bytes)",

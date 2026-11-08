@@ -139,10 +139,7 @@ unsafe fn required_out<'a, T>(value: *mut T) -> Result<&'a mut T, (Fs80hStatus, 
     }
 }
 
-unsafe fn required_ref<'a, T>(
-    value: *const T,
-    name: &str,
-) -> Result<&'a T, (Fs80hStatus, String)> {
+unsafe fn required_ref<'a, T>(value: *const T, name: &str) -> Result<&'a T, (Fs80hStatus, String)> {
     if value.is_null() {
         Err((Fs80hStatus::InvalidArgument, format!("{name} is null")))
     } else {

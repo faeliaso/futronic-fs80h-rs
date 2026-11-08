@@ -63,6 +63,8 @@ cargo build --release --features native
 
 The local package is written to `dist/`. For the optional NFIQ2 variant, separately install NFIQ2 2.3, OpenCV, and the model; point `NFIQ2_DIR` at that installation and add the `nfiq2` feature. Those components are not redistributed by this project and need their own license review.
 
+To compile the C example directly against a local artifact, link with `-lfutronic_fs80h_rs`.
+
 ## Compatibility
 
 Check `fs80h_abi_version()` before calling API functions. ABI v1 preserves existing names, signatures, ownership rules, and `fs80h_status` values; incompatible changes require a new ABI revision.

@@ -19,9 +19,9 @@ pub mod biometric_core;
 mod device;
 pub mod discovery;
 pub mod error;
-pub mod frame;
 #[cfg(feature = "native")]
 mod ffi;
+pub mod frame;
 #[cfg(feature = "lfd-research")]
 pub mod lfd;
 #[cfg(feature = "matcher")]

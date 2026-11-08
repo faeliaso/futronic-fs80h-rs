@@ -111,7 +111,9 @@ impl FromStr for DeviceId {
         })?;
 
         let address = addr_str.parse::<u8>().map_err(|_| {
-            ParseDeviceIdError::new(format!("invalid device address '{addr_str}'; must be 0-255"))
+            ParseDeviceIdError::new(format!(
+                "invalid device address '{addr_str}'; must be 0-255"
+            ))
         })?;
 
         Ok(Self::new(bus_number, address))
@@ -162,7 +164,8 @@ pub fn list_devices() -> Result<Vec<DiscoveredDevice>, ScannerError> {
             Err(_) => continue,
         };
 
-        if descriptor.vendor_id() != FUTRONIC_VID || !is_supported_product(descriptor.product_id()) {
+        if descriptor.vendor_id() != FUTRONIC_VID || !is_supported_product(descriptor.product_id())
+        {
             continue;
         }
 
@@ -206,7 +209,8 @@ pub fn open_device_by_id(id: &DeviceId) -> Result<FutronicDevice, ScannerError> 
             .device_descriptor()
             .map_err(|error| usb_error(UsbOperation::ReadDescriptor, error))?;
 
-        if descriptor.vendor_id() != FUTRONIC_VID || !is_supported_product(descriptor.product_id()) {
+        if descriptor.vendor_id() != FUTRONIC_VID || !is_supported_product(descriptor.product_id())
+        {
             return Err(ScannerError::DeviceWithIdNotFound(*id));
         }
 

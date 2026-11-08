@@ -63,6 +63,8 @@ cargo build --release --features native,lfd-experimental-decision
 
 O pacote local fica em `dist/`. Para a variante NFIQ2, instale NFIQ2 2.3, OpenCV e o modelo separadamente, aponte `NFIQ2_DIR` à instalação e inclua `nfiq2` nas features. Esses componentes não são redistribuídos pelo projeto e requerem análise de licença própria.
 
+Para compilar o exemplo C diretamente contra o artefato local, use `-lfutronic_fs80h_rs`.
+
 ## Compatibilidade
 
 Confira `fs80h_abi_version()` antes de chamar funções. A ABI v1 preserva nomes, assinaturas, ownership e valores existentes de `fs80h_status`; mudanças incompatíveis exigirão uma nova versão ABI. As APIs LFD são experimentais e não devem ser usadas como controle anti-spoof.

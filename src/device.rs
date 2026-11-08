@@ -923,7 +923,9 @@ impl Drop for FutronicDevice {
     }
 }
 
-pub(crate) fn find_capture_interface(device: &Device<GlobalContext>) -> Result<(u8, u8, u8), ScannerError> {
+pub(crate) fn find_capture_interface(
+    device: &Device<GlobalContext>,
+) -> Result<(u8, u8, u8), ScannerError> {
     let config = device
         .active_config_descriptor()
         .map_err(|error| usb_error(UsbOperation::ReadDescriptor, error))?;
