@@ -45,3 +45,10 @@ host que recebeu o dispositivo.
 | Geometria observada | |
 | Resultado | |
 | Logs sem dados biométricos | |
+
+## Resultados registrados
+
+| Data | SO | Crate | Modelo/PID | Modo | Geometria | Resultado | Log sem biometria |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-08 | macOS 27.2 (26B123) | 0.3.0 | FS80H / `0020` | dose variável (`166`) | 320×480, 500 DPI | sucesso | `capture succeeded: model=FS80H pid=0020 geometry=320x480 dpi=500 mode=variable-dose` |
+| 2026-11-08 | macOS 27.2 (26B123) | 0.3.0 | FS80H / `0020` | frame mode | 320×480, 500 DPI | sucesso | `capture succeeded: model=FS80H pid=0020 geometry=320x480 dpi=500 mode=frame-mode` |

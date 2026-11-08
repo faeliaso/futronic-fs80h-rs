@@ -32,7 +32,8 @@ O MSRV é Rust 1.70.
 | FS81H | `0025` | 384×800 | 320×480, 500 DPI | frame mode e dose variável |
 
 O driver usa `libusb` em Linux e macOS. A execução automática cobre a lógica
-sem hardware; a validação física por SO, modelo e modo deve seguir o
+sem hardware. O FS80H foi validado em macOS 27.2 nos modos frame mode e dose
+variável; as demais combinações devem seguir o
 [roteiro de hardware](docs/HARDWARE_VALIDATION.md). Não registre dados
 biométricos nos logs.
 
